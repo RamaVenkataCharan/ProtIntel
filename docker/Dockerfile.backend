@@ -1,0 +1,58 @@
+# ProtIntel Backend Dockerfile
+# Multi-stage build for lean production image
+
+# Stage 1: Builder
+FROM python:3.11-slim as builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for layer caching
+COPY requirements.txt .
+
+# Install CPU-only PyTorch by default (GPU via build arg)
+ARG TORCH_VARIANT=cpu
+RUN if [ "$TORCH_VARIANT" = "cpu" ]; then \
+        pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu; \
+    fi
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Stage 2: Runtime
+FROM python:3.11-slim as runtime
+
+WORKDIR /app
+
+# Install minimal runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy installed packages from builder
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy application code
+COPY src/ /app/src/
+COPY backend/ /app/backend/
+COPY configs/ /app/configs/
+
+# Create directories
+RUN mkdir -p /app/models /app/datasets/processed/embeddings /app/logs
+
+# Environment
+ENV PYTHONPATH=/app
+ENV DEVICE=cpu
+ENV API_HOST=0.0.0.0
+ENV API_PORT=8000
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD python -c "import requests; r = requests.get('http://localhost:8000/health'); assert r.status_code == 200"
+
+CMD ["python", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

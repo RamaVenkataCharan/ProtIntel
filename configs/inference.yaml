@@ -1,0 +1,37 @@
+# ProtIntel — Inference Configuration
+
+inference:
+  # Model checkpoint
+  checkpoint_path: models/best_checkpoint.pt
+  device: cpu                       # cpu | cuda | cuda:0
+
+  # ESM-2 settings for inference
+  esm2:
+    model_name: "facebook/esm2_t33_650M_UR50D"
+    cache_embeddings: true          # Cache embeddings to disk during inference
+    cache_dir: datasets/processed/embeddings
+
+  # Batch inference
+  batch:
+    max_sequences: 50               # Maximum sequences per batch request
+    max_sequence_length: 1024       # Maximum residues per sequence
+    timeout_seconds: 300            # Timeout for batch processing
+
+  # Output options
+  output:
+    return_probabilities: true
+    return_confidence: true
+    return_attention: false         # Attention maps are large; disable by default
+    return_xai: false              # XAI is computationally expensive; disable by default
+    default_xai_method: ig         # ig | shap | rollout
+
+  # XAI settings
+  xai:
+    integrated_gradients_steps: 50
+    gradient_shap_samples: 20
+    attention_rollout_head_fusion: mean  # mean | max | min
+
+  # Export settings
+  export:
+    formats: ["json", "csv"]       # Available: json, csv, pdf
+    pdf_template: null             # Custom PDF template path (optional)

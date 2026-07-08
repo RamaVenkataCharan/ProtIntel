@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel>=0.41.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "protintel"
+version = "1.0.0"
+description = "Explainable Protein Secondary Structure Prediction using ESM-2, CNN-BiLSTM, and Attention"
+readme = "docs/README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "B. Murali Gopi"},
+    {name = "M. Kumar Siva Sai"},
+    {name = "M. Rama Venkata Charan"},
+    {name = "Yashwanth Prakash"},
+]
+keywords = [
+    "protein",
+    "secondary-structure",
+    "bioinformatics",
+    "deep-learning",
+    "esm2",
+    "explainable-ai",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.urls]
+Homepage = "https://github.com/RamaVenkataCharan/ProtIntel"
+Repository = "https://github.com/RamaVenkataCharan/ProtIntel"
+Documentation = "https://github.com/RamaVenkataCharan/ProtIntel/tree/main/docs"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*", "backend*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+markers = [
+    "slow: marks tests that require model downloads or heavy computation",
+    "integration: marks integration tests",
+    "api: marks API endpoint tests",
+]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+known_first_party = ["src", "backend"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true

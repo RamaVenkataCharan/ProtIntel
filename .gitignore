@@ -1,0 +1,76 @@
+# ProtIntel — Explainable Protein Secondary Structure Prediction
+# See docs/README.md for full documentation
+
+# Datasets (raw and processed)
+datasets/
+!datasets/.gitkeep
+
+# Model checkpoints
+models/
+!models/.gitkeep
+
+# Training logs
+logs/
+!logs/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment variables
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Distribution
+*.tar.gz
+*.whl
+
+# ESM-2 cache
+.cache/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+
+# Docker
+*.log
+
+# Wandb
+wandb/
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# mypy
+.mypy_cache/

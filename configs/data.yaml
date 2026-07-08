@@ -1,0 +1,153 @@
+# ProtIntel — Data Configuration
+
+data:
+  # ────────────────────────────────────────────────────────────────
+  # Directory paths (relative to project root)
+  # ────────────────────────────────────────────────────────────────
+  raw_dir: datasets/raw
+  processed_dir: datasets/processed
+  embeddings_dir: datasets/processed/embeddings
+
+  # ────────────────────────────────────────────────────────────────
+  # Dataset file names (relative to raw_dir)
+  # ────────────────────────────────────────────────────────────────
+  cullpdb_file: cullpdb+profile_6133_filtered.npy.gz
+  cb513_file: cb513+profile_split1.npy.gz
+  rs126_file: rs126+profile_split1.npy.gz
+
+  # ────────────────────────────────────────────────────────────────
+  # Dataset sources (metadata for reference)
+  # ────────────────────────────────────────────────────────────────
+  datasets:
+    cullpdb:
+      name: CullPDB
+      url: "https://www.princeton.edu/~jzthree/datasets/ICML2014/cullpdb+profile_6133_filtered.npy.gz"
+      format: npy
+      num_proteins: 6133
+      split: train
+
+    cb513:
+      name: CB513
+      url: "https://www.princeton.edu/~jzthree/datasets/ICML2014/cb513+profile_split1.npy.gz"
+      format: npy
+      num_proteins: 513
+      split: test
+
+    rs126:
+      name: RS126
+      url: "https://www.princeton.edu/~jzthree/datasets/ICML2014/rs126+profile_split1.npy.gz"
+      format: npy
+      num_proteins: 126
+      split: validation
+
+    casp12:
+      name: CASP12
+      format: fasta
+      num_proteins: null            # Variable
+      split: benchmark
+
+  # ────────────────────────────────────────────────────────────────
+  # Sequence settings
+  # ────────────────────────────────────────────────────────────────
+  max_seq_length: 512
+  chunk_overlap: 64
+  min_seq_length: 10
+
+  # Non-standard amino acid handling
+  nonstandard_policy: mask          # mask | replace
+
+  # ────────────────────────────────────────────────────────────────
+  # Preprocessing
+  # ────────────────────────────────────────────────────────────────
+  preprocessing:
+    max_sequence_length: 512
+    sliding_window_overlap: 64      # Overlap for chunked sequences
+    min_sequence_length: 10         # Discard sequences shorter than this
+
+    # Non-standard amino acid handling
+    # Options: mask | replace
+    nonstandard_policy: mask
+    nonstandard_mapping:
+      B: D                          # Aspartate/Asparagine → Aspartate
+      Z: E                          # Glutamate/Glutamine → Glutamate
+      J: L                          # Leucine/Isoleucine → Leucine
+      O: K                          # Pyrrolysine → Lysine
+      U: C                          # Selenocysteine → Cysteine
+      X: X                          # Unknown → masked
+
+    # Deduplication
+    deduplication:
+      enabled: true
+      identity_threshold: 0.25      # Remove sequences with >25% similarity to test set
+
+  # ────────────────────────────────────────────────────────────────
+  # DataLoader settings
+  # ────────────────────────────────────────────────────────────────
+  batch_size: 8
+  dataloader:
+    num_workers: 4
+    pin_memory: true
+    prefetch_factor: 2
+    persistent_workers: true
+    drop_last: false
+
+  # ────────────────────────────────────────────────────────────────
+  # Embedding cache
+  # ────────────────────────────────────────────────────────────────
+  use_embedding_cache: true
+  embeddings_cache_dir: datasets/processed/embeddings
+
+  # ────────────────────────────────────────────────────────────────
+  # Augmentation
+  # ────────────────────────────────────────────────────────────────
+  augmentation:
+    enabled: false
+    mask_prob: 0.05
+    crop_min_frac: 0.8
+    augment_prob: 0.3
+
+  # ────────────────────────────────────────────────────────────────
+  # Dataset splits
+  # ────────────────────────────────────────────────────────────────
+  splits:
+    train: cullpdb
+    val: rs126
+    test: cb513
+
+  # ────────────────────────────────────────────────────────────────
+  # Label encoding
+  # ────────────────────────────────────────────────────────────────
+  labels:
+    q3_classes: ["H", "E", "C"]
+    q8_classes: ["H", "E", "G", "I", "B", "T", "S", "C"]
+    q3_mapping:
+      H: 0                          # Helix
+      E: 1                          # Sheet
+      C: 2                          # Coil
+    q8_mapping:
+      H: 0                          # α-helix
+      E: 1                          # β-strand
+      G: 2                          # 3₁₀-helix
+      I: 3                          # π-helix
+      B: 4                          # β-bridge
+      T: 5                          # Turn
+      S: 6                          # Bend
+      C: 7                          # Coil
+    # Q8 to Q3 reduction mapping
+    q8_to_q3:
+      H: H
+      G: H
+      I: H
+      E: E
+      B: E
+      T: C
+      S: C
+      C: C
+
+  # ────────────────────────────────────────────────────────────────
+  # Class mappings (flat access)
+  # ────────────────────────────────────────────────────────────────
+  q3_classes: ["H", "E", "C"]
+  q8_classes: ["H", "E", "G", "I", "B", "T", "S", "C"]
+  q3_to_idx: {"H": 0, "E": 1, "C": 2}
+  q8_to_idx: {"H": 0, "E": 1, "G": 2, "I": 3, "B": 4, "T": 5, "S": 6, "C": 7}
