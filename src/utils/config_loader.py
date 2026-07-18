@@ -61,8 +61,8 @@ def load_yaml(config_path: str | Path) -> dict[str, Any]:
 class ESM2Config(BaseModel):
     """ESM-2 backbone configuration."""
 
-    model_name: str = "facebook/esm2_t33_650M_UR50D"
-    embedding_dim: int = 1280
+    model_name: str = "facebook/esm2_t12_35M_UR50D"
+    embedding_dim: int = 480
     freeze: bool = True
     finetune_last_n_layers: int = 0
 
@@ -70,7 +70,7 @@ class ESM2Config(BaseModel):
 class CNNConfig(BaseModel):
     """Multi-scale CNN encoder configuration."""
 
-    input_dim: int = 1280
+    input_dim: int = 480
     hidden_dim: int = 512
     kernel_sizes: list[int] = Field(default_factory=lambda: [3, 5, 7])
     num_residual_blocks: int = 3
