@@ -45,7 +45,7 @@ export const useModelStore = create<ModelStoreState>((set) => ({
       }
 
       set({
-        isHealthy: health.status === 'healthy',
+        isHealthy: health.status === 'healthy' || health.status === 'degraded',
         modelLoaded: health.model_loaded,
         device: health.device,
         modelInfo: info,
