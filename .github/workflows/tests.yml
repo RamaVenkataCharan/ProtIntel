@@ -20,11 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ────────────────────────────────────────────────────────────────────────────
-  # Job 1 — Unit tests (no model download, no GPU, fast)
-  # Covers: FASTA parser, preprocessor, augmentation, dataset collation
-  # ────────────────────────────────────────────────────────────────────────────
-  unit-tests:
+
     name: Unit Tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:

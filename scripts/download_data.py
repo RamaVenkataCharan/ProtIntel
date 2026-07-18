@@ -89,6 +89,7 @@ DATASETS: list[DatasetSpec] = [
     DatasetSpec(
         name="CullPDB (filtered, 6133 proteins)",
         url=(
+            "https://web.archive.org/web/20221017031809/"
             "https://www.princeton.edu/~jzthree/datasets/ICML2014/"
             "cullpdb+profile_6133_filtered.npy.gz"
         ),
@@ -99,6 +100,7 @@ DATASETS: list[DatasetSpec] = [
     DatasetSpec(
         name="CB513 (513 proteins)",
         url=(
+            "https://web.archive.org/web/20221017031809/"
             "https://www.princeton.edu/~jzthree/datasets/ICML2014/"
             "cb513+profile_split1.npy.gz"
         ),
@@ -109,6 +111,7 @@ DATASETS: list[DatasetSpec] = [
     DatasetSpec(
         name="RS126 (126 proteins)",
         url=(
+            "https://web.archive.org/web/20221017031809/"
             "https://www.princeton.edu/~jzthree/datasets/ICML2014/"
             "rs126+profile_split1.npy.gz"
         ),

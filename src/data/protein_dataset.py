@@ -233,8 +233,13 @@ class ProteinDataset(Dataset):
         # Handle .npy.gz files
         if path.name.endswith(".npy.gz"):
             import io
-            with gzip.open(str(path), "rb") as f:
-                data = np.load(io.BytesIO(f.read()))
+            try:
+                with gzip.open(str(path), "rb") as f:
+                    data = np.load(io.BytesIO(f.read()))
+            except gzip.BadGzipFile:
+                # Wayback Machine sometimes serves uncompressed .npy files with .gz extension
+                logger.warning(f"File {path.name} is not a valid gzip. Attempting uncompressed load.")
+                data = np.load(str(path))
         elif path.suffix == ".npz":
             with np.load(str(path)) as npz:
                 keys = list(npz.keys())
