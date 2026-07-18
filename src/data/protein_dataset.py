@@ -74,7 +74,7 @@ def _get_esm_tokenizer() -> Any:
     try:
         from transformers import AutoTokenizer
         tokenizer = AutoTokenizer.from_pretrained(
-            "facebook/esm2_t33_650M_UR50D"
+            "facebook/esm2_t12_35M_UR50D"
         )
         return tokenizer
     except ImportError as exc:
