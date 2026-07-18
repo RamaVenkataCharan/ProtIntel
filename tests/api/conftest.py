@@ -2,9 +2,9 @@
 
 Fixture-model rationale
 -----------------------
-The ProtIntelModel embeds ESM-2 (facebook/esm2_t33_650M_UR50D), a 1.3 GB
-download that takes 30-120 s to load.  Running that in CI on every push is
-impractical and requires GPU-class hardware for reasonable speed.
+The ProtIntelModel embeds ESM-2 (facebook/esm2_t12_35M_UR50D), a ~140 MB
+download that takes a few seconds to load.  Running that in CI on every push is
+impractical.
 
 Instead, every fixture here wires the FastAPI application to a *toy*
 InferenceService whose internal ProtIntelModel uses a randomly-initialised
