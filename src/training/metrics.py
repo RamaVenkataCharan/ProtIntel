@@ -84,6 +84,22 @@ class ProteinMetrics:
         self.q8_confusion = torchmetrics.ConfusionMatrix(
             task="multiclass", num_classes=num_q8_classes, normalize="true"
         ).to(device)
+        self.q8_precision_per_class = torchmetrics.Precision(
+            task="multiclass", num_classes=num_q8_classes, average="none"
+        ).to(device)
+        self.q8_recall_per_class = torchmetrics.Recall(
+            task="multiclass", num_classes=num_q8_classes, average="none"
+        ).to(device)
+        self.q8_f1_per_class = torchmetrics.F1Score(
+            task="multiclass", num_classes=num_q8_classes, average="none"
+        ).to(device)
+        # Also add macro precision/recall for Q8
+        self.q8_precision = torchmetrics.Precision(
+            task="multiclass", num_classes=num_q8_classes, average="macro"
+        ).to(device)
+        self.q8_recall = torchmetrics.Recall(
+            task="multiclass", num_classes=num_q8_classes, average="macro"
+        ).to(device)
 
     def update(
         self,
@@ -132,6 +148,11 @@ class ProteinMetrics:
             self.q8_f1_weighted.update(q8_p, q8_t)
             self.q8_mcc.update(q8_p, q8_t)
             self.q8_confusion.update(q8_p, q8_t)
+            self.q8_precision_per_class.update(q8_p, q8_t)
+            self.q8_recall_per_class.update(q8_p, q8_t)
+            self.q8_f1_per_class.update(q8_p, q8_t)
+            self.q8_precision.update(q8_p, q8_t)
+            self.q8_recall.update(q8_p, q8_t)
 
     def compute(self) -> dict[str, float | list[float]]:
         """Compute all accumulated metrics.
@@ -164,8 +185,18 @@ class ProteinMetrics:
             results[f"q8_accuracy_{name}"] = q8_per_class[i].item()
         results["q8_f1_macro"] = self.q8_f1_macro.compute().item()
         results["q8_f1_weighted"] = self.q8_f1_weighted.compute().item()
+        results["q8_precision"] = self.q8_precision.compute().item()
+        results["q8_recall"] = self.q8_recall.compute().item()
         results["q8_mcc"] = self.q8_mcc.compute().item()
         results["q8_confusion_matrix"] = self.q8_confusion.compute().cpu().tolist()
+        # Per-class Q8 precision / recall / F1
+        q8_prec_pc = self.q8_precision_per_class.compute()
+        q8_rec_pc = self.q8_recall_per_class.compute()
+        q8_f1_pc = self.q8_f1_per_class.compute()
+        for i, name in enumerate(q8_class_names):
+            results[f"q8_precision_{name}"] = q8_prec_pc[i].item()
+            results[f"q8_recall_{name}"] = q8_rec_pc[i].item()
+            results[f"q8_f1_{name}"] = q8_f1_pc[i].item()
 
         return results
 
@@ -186,6 +217,7 @@ class ProteinMetrics:
             Dictionary of key metric values.
         """
         results = self.compute()
+        q8_class_names = ["H", "E", "G", "I", "B", "T", "S", "C"]
 
         summary = {
             f"{prefix}q3_accuracy": results["q3_accuracy"],
@@ -195,19 +227,30 @@ class ProteinMetrics:
             f"{prefix}q8_f1_macro": results["q8_f1_macro"],
         }
 
-        logger.info(f"{'='*50}")
+        logger.info(f"{'='*60}")
         logger.info(f"Metrics Summary ({prefix.rstrip('_') or 'eval'}):")
-        logger.info(f"  Q3 Accuracy: {results['q3_accuracy']:.4f}")
-        logger.info(f"  Q8 Accuracy: {results['q8_accuracy']:.4f}")
-        logger.info(f"  Q3 MCC:      {results['q3_mcc']:.4f}")
-        logger.info(f"  Q3 F1 macro: {results['q3_f1_macro']:.4f}")
-        logger.info(f"  Q8 F1 macro: {results['q8_f1_macro']:.4f}")
+        logger.info(f"  Q3 Accuracy:      {results['q3_accuracy']:.4f}")
+        logger.info(f"  Q8 Accuracy:      {results['q8_accuracy']:.4f}")
+        logger.info(f"  Q3 MCC:           {results['q3_mcc']:.4f}")
+        logger.info(f"  Q8 MCC:           {results['q8_mcc']:.4f}")
+        logger.info(f"  Q3 F1 macro:      {results['q3_f1_macro']:.4f}")
+        logger.info(f"  Q8 F1 macro:      {results['q8_f1_macro']:.4f}")
+        logger.info(f"  Q8 Precision mac: {results['q8_precision']:.4f}")
+        logger.info(f"  Q8 Recall macro:  {results['q8_recall']:.4f}")
 
         # Per-class Q3
+        logger.info("  --- Q3 per-class ---")
         for cls in ["H", "E", "C"]:
-            key = f"q3_accuracy_{cls}"
-            if key in results:
-                logger.info(f"  Q3 {cls}: {results[key]:.4f}")
+            acc = results.get(f"q3_accuracy_{cls}", 0.0)
+            logger.info(f"    Q3-{cls}: acc={acc:.4f}")
 
-        logger.info(f"{'='*50}")
+        # Per-class Q8 precision / recall / F1
+        logger.info("  --- Q8 per-class precision / recall / F1 ---")
+        for cls in q8_class_names:
+            p = results.get(f"q8_precision_{cls}", 0.0)
+            r = results.get(f"q8_recall_{cls}", 0.0)
+            f = results.get(f"q8_f1_{cls}", 0.0)
+            logger.info(f"    Q8-{cls}: P={p:.4f}  R={r:.4f}  F1={f:.4f}")
+
+        logger.info(f"{'='*60}")
         return summary
