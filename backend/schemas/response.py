@@ -53,7 +53,7 @@ class ModelInfoResponse(BaseModel):
     model_name: str = "ProtIntel"
     version: str = "1.0.0"
     architecture: str = "ESM-2 → CNN → BiLSTM → Attention → Q3/Q8"
-    esm2_model: str = "facebook/esm2_t33_650M_UR50D"
+    esm2_model: str = "facebook/esm2_t12_35M_UR50D"
     total_parameters: int
     trainable_parameters: int
     q3_classes: list[str] = Field(default_factory=lambda: ["H (Helix)", "E (Sheet)", "C (Coil)"])
