@@ -3,14 +3,14 @@
 model:
   # ESM-2 backbone
   esm2:
-    model_name: "facebook/esm2_t33_650M_UR50D"
-    embedding_dim: 1280
+    model_name: "facebook/esm2_t12_35M_UR50D"
+    embedding_dim: 480
     freeze: true                    # Freeze all ESM-2 parameters
     finetune_last_n_layers: 0       # Number of last transformer layers to unfreeze (0 = fully frozen)
 
   # Multi-scale CNN encoder
   cnn:
-    input_dim: 1280                 # Must match ESM-2 embedding_dim
+    input_dim: 480                  # Must match ESM-2 embedding_dim
     hidden_dim: 512
     kernel_sizes: [3, 5, 7]         # Multi-scale convolution kernels
     num_residual_blocks: 3
