@@ -46,7 +46,7 @@ Q3_TO_IDX: dict[str, int] = {"H": 0, "E": 1, "C": 2}
 Q3_CLASSES: list[str] = ["H", "E", "C"]
 
 Q8_TO_IDX: dict[str, int] = {
-    "H": 0, "E": 1, "G": 2, "I": 3, "B": 4, "T": 5, "S": 6, "C": 7,
+    "H": 0, "E": 1, "G": 2, "I": 3, "B": 4, "T": 5, "S": 6, "L": 7, "C": 7,
 }
 Q8_CLASSES: list[str] = ["H", "E", "G", "I", "B", "T", "S", "C"]
 

@@ -40,21 +40,29 @@ _NPY_SEQ_LEN: int = 700
 _NPY_FEATURE_DIM: int = 57
 _AA_ONEHOT_START: int = 0
 _AA_ONEHOT_END: int = 21        # exclusive, columns 0–20
-_Q8_LABEL_START: int = 35
-_Q8_LABEL_END: int = 43         # exclusive, columns 35–42 (8 Q8 classes)
-_NOSEQ_COL: int = 43            # no-structure sentinel column
+_Q8_LABEL_START: int = 22
+_Q8_LABEL_END: int = 30         # exclusive, columns 22–29 (8 Q8 classes: L, B, E, G, I, H, S, T)
 _AA_INDEX_TABLE: str = "ACDEFGHIKLMNPQRSTVWYX"  # 20 AAs + X (unknown)
+_CULLPDB_Q8_CLASSES: list[str] = ["L", "B", "E", "G", "I", "H", "S", "T"]
 
-# Q8 → Q3 reduction
+# Q8 → Q3 reduction map:
+# 0: L (Coil)   → 2 (C)
+# 1: B (Bridge) → 1 (E)
+# 2: E (Strand) → 1 (E)
+# 3: G (3-10)   → 0 (H)
+# 4: I (Pi)     → 0 (H)
+# 5: H (Alpha)  → 0 (H)
+# 6: S (Bend)   → 2 (C)
+# 7: T (Turn)   → 2 (C)
 _Q8_TO_Q3_REDUCTION: dict[int, int] = {
-    0: 0,  # H → H
-    1: 1,  # E → E
-    2: 0,  # G → H
-    3: 0,  # I → H
-    4: 1,  # B → E
-    5: 2,  # T → C
+    0: 2,  # L → C
+    1: 1,  # B → E
+    2: 1,  # E → E
+    3: 0,  # G → H
+    4: 0,  # I → H
+    5: 0,  # H → H
     6: 2,  # S → C
-    7: 2,  # C → C
+    7: 2,  # T → C
 }
 
 # ESM-2 tokenizer constants (avoid importing transformers at module level)
@@ -268,18 +276,27 @@ class ProteinDataset(Dataset):
 
         logger.info(f"Loaded NumPy array with shape {data.shape} from {path.name}")
 
+        max_samples = self.config.get("max_samples")
+        if max_samples is not None:
+            if self.split == "train":
+                data = data[:max_samples]
+                logger.info(f"Limited training split to {len(data)} samples.")
+            elif self.split in ("val", "test"):
+                val_limit = min(100, len(data))
+                data = data[:val_limit]
+                logger.info(f"Limited {self.split} split to {len(data)} samples for speed.")
+
         for idx in range(data.shape[0]):
             sample = data[idx]  # shape: (700, 57)
 
             # Extract amino acid sequence from one-hot encoding (columns 0-20)
             aa_onehot = sample[:, _AA_ONEHOT_START:_AA_ONEHOT_END]
-            noseq = sample[:, _NOSEQ_COL]
 
-            # Extract Q8 labels (columns 35-42)
+            # Extract Q8 labels (columns 22-29)
             q8_onehot = sample[:, _Q8_LABEL_START:_Q8_LABEL_END]
 
-            # Find actual sequence length (where noseq == 0)
-            seq_mask = noseq == 0
+            # Find actual sequence length (where q8_onehot sum == 1.0)
+            seq_mask = q8_onehot.sum(axis=1) == 1.0
             seq_length = int(seq_mask.sum())
 
             if seq_length == 0:
@@ -301,8 +318,8 @@ class ProteinDataset(Dataset):
             q3_chars: list[str] = []
             for q8_idx in q8_indices:
                 q8_idx_int = int(q8_idx)
-                if 0 <= q8_idx_int < len(Q8_CLASSES):
-                    q8_chars.append(Q8_CLASSES[q8_idx_int])
+                if 0 <= q8_idx_int < len(_CULLPDB_Q8_CLASSES):
+                    q8_chars.append(_CULLPDB_Q8_CLASSES[q8_idx_int])
                     q3_idx = _Q8_TO_Q3_REDUCTION.get(q8_idx_int, 2)
                     q3_chars.append(Q3_CLASSES[q3_idx])
                 else:
