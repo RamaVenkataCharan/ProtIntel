@@ -341,12 +341,13 @@ def check_embedding_sanity() -> str:
                     return "FAIL"
 
                 # Check dimensions
-                if emb.dim() == 2 and emb.shape[1] == 1280:
+                expected_dim = config.model.esm2.embedding_dim
+                if emb.dim() == 2 and emb.shape[1] == expected_dim:
                     result_line("Embedding dimensions", PASS,
-                                f"(L={emb.shape[0]}, D=1280)")
+                                f"(L={emb.shape[0]}, D={expected_dim})")
                 else:
                     result_line("Embedding dimensions", FAIL,
-                                f"expected (L, 1280), got {emb.shape}")
+                                f"expected (L, {expected_dim}), got {emb.shape}")
                     return "FAIL"
 
                 # Check for NaN/Inf

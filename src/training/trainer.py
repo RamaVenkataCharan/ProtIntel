@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+import os
+import sys
 import time
 from pathlib import Path
 from typing import Any, Optional
+
+import numpy as np
+if not hasattr(np, "bool8"):
+    np.bool8 = np.bool_  # type: ignore[attr-defined]
+sys.modules["tensorflow"] = None
 
 import torch
 import torch.nn as nn

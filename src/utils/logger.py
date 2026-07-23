@@ -11,6 +11,13 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 
 _CONFIGURED = False
 

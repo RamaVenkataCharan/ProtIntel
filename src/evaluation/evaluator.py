@@ -65,7 +65,7 @@ class Evaluator:
         checkpoint = torch.load(
             str(checkpoint_path), map_location=device, weights_only=False
         )
-        model.load_state_dict(checkpoint["model_state_dict"])
+        model.load_state_dict(checkpoint["model_state_dict"], strict=False)
         logger.info(f"Loaded checkpoint from {checkpoint_path}")
 
         if "metrics" in checkpoint:
