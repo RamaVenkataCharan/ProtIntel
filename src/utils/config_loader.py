@@ -269,6 +269,7 @@ class DataConfig(BaseModel):
     raw_dir: str = "datasets/raw"
     processed_dir: str = "datasets/processed"
     embeddings_cache_dir: str = "datasets/processed/embeddings"
+    max_samples: int | None = None
     preprocessing: PreprocessingConfig = Field(default_factory=PreprocessingConfig)
     dataloader: DataLoaderConfig = Field(default_factory=DataLoaderConfig)
     labels: LabelConfig = Field(default_factory=LabelConfig)

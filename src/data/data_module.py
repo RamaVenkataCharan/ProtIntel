@@ -186,6 +186,7 @@ class ProteinDataModule:
             ),
             "embeddings_dir": str(self.embeddings_dir),
             "augmentation": augmentation,
+            "max_samples": self.config.get("max_samples", None),
         }
 
     def _resolve_split_path(self, split: str) -> Path:
@@ -441,6 +442,7 @@ class ProteinDataModule:
             "embeddings_dir": config.embeddings_cache_dir,
             "embeddings_cache_dir": config.embeddings_cache_dir,
             "use_embedding_cache": True,
+            "max_samples": config.max_samples,
             "dataloader": {
                 "num_workers": config.dataloader.num_workers,
                 "pin_memory": config.dataloader.pin_memory,
