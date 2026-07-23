@@ -15,6 +15,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
@@ -26,34 +27,8 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Create FastAPI app
-app = FastAPI(
-    title="ProtIntel API",
-    description=(
-        "Explainable Protein Secondary Structure Prediction using "
-        "ESM-2, CNN-BiLSTM, and Attention"
-    ),
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-)
-
-# Configure CORS
-configure_cors(app)
-
-# Mount evaluation static files
-evaluation_dir = PROJECT_ROOT / "logs" / "evaluation"
-evaluation_dir.mkdir(parents=True, exist_ok=True)
-app.mount("/evaluation-images", StaticFiles(directory=str(evaluation_dir)), name="evaluation-images")
-
-# Include routers
-app.include_router(predict.router)
-app.include_router(upload.router)
-app.include_router(info.router)
-
-
-@app.on_event("startup")
-async def startup_event() -> None:
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     """Load the model on application startup."""
     logger.info("Starting ProtIntel API server...")
 
@@ -76,6 +51,37 @@ async def startup_event() -> None:
 
     predict.set_inference_service(service)
     logger.info("ProtIntel API ready!")
+    yield
+
+
+# Create FastAPI app
+app = FastAPI(
+    title="ProtIntel API",
+    description=(
+        "Explainable Protein Secondary Structure Prediction using "
+        "ESM-2, CNN-BiLSTM, and Attention"
+    ),
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    lifespan=lifespan,
+)
+
+# Configure CORS
+configure_cors(app)
+
+# Mount evaluation static files
+evaluation_dir = PROJECT_ROOT / "logs" / "evaluation"
+evaluation_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/evaluation-images", StaticFiles(directory=str(evaluation_dir)), name="evaluation-images")
+
+# Include routers
+app.include_router(predict.router)
+app.include_router(upload.router)
+app.include_router(info.router)
+
+
+
 
 
 @app.get("/")
