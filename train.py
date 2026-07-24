@@ -79,6 +79,14 @@ def main() -> None:
         config=config.data,
         batch_size=config.training.batch_size,
     )
+    is_finetuning = (
+        config.model.esm2.finetune_last_n_layers > 0
+        or not config.model.esm2.freeze
+    )
+    if is_finetuning and config.training.get("finetune_mode", True):
+        logger.info("ESM-2 fine-tuning active: disabling dataset embedding cache for training.")
+        data_module.use_embedding_cache = False
+
     data_module.setup()
 
     train_loader = data_module.train_dataloader()

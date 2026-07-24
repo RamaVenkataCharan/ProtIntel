@@ -52,6 +52,11 @@ def main() -> None:
 
     # Load test data
     data_module = DataModule.from_config(config=config.data, batch_size=args.batch_size)
+    is_finetuning = evaluator.model.embedding_generator.finetune_last_n_layers > 0 or not evaluator.model.embedding_generator.freeze
+    if is_finetuning:
+        logger.info("Loaded model has fine-tuned ESM-2: disabling dataset embedding cache for evaluation.")
+        data_module.use_embedding_cache = False
+
     data_module.setup(stage="test")
 
     output_dir = Path(args.output_dir)

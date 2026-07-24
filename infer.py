@@ -14,7 +14,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.data.fasta_parser import parse_fasta_string, read_fasta
+from src.data.fasta_parser import parse_fasta, parse_fasta_string
 from src.utils.config_loader import load_config
 from src.utils.logger import get_logger
 from src.utils.reproducibility import get_device
@@ -54,13 +54,13 @@ def main() -> None:
     # Get sequences
     sequences: list[tuple[str, str]] = []
     if args.file:
-        records = read_fasta(args.file)
-        sequences = [(r.protein_id, r.sequence) for r in records]
+        records = parse_fasta(args.file)
+        sequences = [(r["id"], r["sequence"]) for r in records]
     elif args.sequence:
         # Check if it's FASTA format
         if args.sequence.startswith(">"):
             records = parse_fasta_string(args.sequence)
-            sequences = [(r.protein_id, r.sequence) for r in records]
+            sequences = [(r["id"], r["sequence"]) for r in records]
         else:
             sequences = [("query", args.sequence)]
 
