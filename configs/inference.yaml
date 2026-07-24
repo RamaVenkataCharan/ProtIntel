@@ -7,7 +7,7 @@ inference:
 
   # ESM-2 settings for inference
   esm2:
-    model_name: "facebook/esm2_t12_35M_UR50D"
+    model_name: "facebook/esm2_t33_650M_UR50D"
     cache_embeddings: true          # Cache embeddings to disk during inference
     cache_dir: datasets/processed/embeddings
 

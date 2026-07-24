@@ -6,7 +6,7 @@ data:
   # ────────────────────────────────────────────────────────────────
   raw_dir: datasets/raw
   processed_dir: datasets/processed
-  embeddings_dir: datasets/processed/embeddings
+  embeddings_dir: datasets/processed/embeddings_650m
   max_samples: 60
 
   # ────────────────────────────────────────────────────────────────
@@ -101,7 +101,7 @@ data:
   # Embedding cache
   # ────────────────────────────────────────────────────────────────
   use_embedding_cache: true
-  embeddings_cache_dir: datasets/processed/embeddings
+  embeddings_cache_dir: datasets/processed/embeddings_650m
 
   # ────────────────────────────────────────────────────────────────
   # Augmentation

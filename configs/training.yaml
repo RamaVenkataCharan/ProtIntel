@@ -9,6 +9,7 @@ training:
   gradient_clip_norm: 1.0
   gradient_accumulation_steps: 4
   mixed_precision: true             # torch.cuda.amp automatic mixed precision
+  finetune_mode: true               # Disable embedding cache ONLY when ESM-2 layers are unfrozen
 
   # Optimizer
   optimizer: adamw                  # adamw | adam | sgd
@@ -44,11 +45,11 @@ training:
 
   # Loss function
   loss:
-    type: cross_entropy             # cross_entropy | focal
+    type: focal                     # cross_entropy | focal
     label_smoothing: 0.1
     use_class_weights: true         # Compute weights from inverse class frequency
     # Focal loss parameters (used if type: focal)
-    focal_gamma: 2.0
+    focal_gamma: 3.0
     focal_alpha: null               # null = compute from class frequencies
 
   # Multi-task loss weighting
