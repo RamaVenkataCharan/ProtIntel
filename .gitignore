@@ -2,16 +2,16 @@
 # See docs/README.md for full documentation
 
 # Datasets (raw and processed)
-datasets/
-!datasets/.gitkeep
+/datasets/
+!/datasets/.gitkeep
 
 # Model checkpoints
-models/
-!models/.gitkeep
+/models/
+!/models/.gitkeep
 
 # Training logs
-logs/
-!logs/.gitkeep
+/logs/
+!/logs/.gitkeep
 
 # Python
 __pycache__/
