@@ -15,7 +15,7 @@ export const Predict: React.FC = () => {
   const [xaiMethod, setXaiMethod] = useState<'ig' | 'shap' | 'rollout'>('ig');
   const [validationError, setValidationError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'confidence' | 'attention' | 'xai'>('overview');
-  const [hoveredResidue, setHoveredResidue] = useState<{ index: number; aa: string; q3: string; q8: string; q3_prob: number[]; q8_prob: number[]; conf: number } | null>(null);
+  const [hoveredResidue, setHoveredResidue] = useState<{ index: number; aa: string; q3: string; q8: string; q3_prob: number[]; q8_prob: number[]; conf: number; importance?: number } | null>(null);
 
   // Validate sequence character and length constraints
   const handleSequenceChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -263,15 +263,24 @@ export const Predict: React.FC = () => {
                     const conf = activePrediction.confidence[idx];
                     const q3_prob = activePrediction.q3_probabilities[idx];
                     const q8_prob = activePrediction.q8_probabilities[idx];
+                    const importance = activePrediction.residue_importance?.[idx] || 0;
                     const isHovered = hoveredResidue?.index === idx;
+
+                    const cellBg = activeTab === 'xai'
+                      ? `rgba(16, 185, 129, ${0.05 + importance * 0.45})`
+                      : undefined;
+                    const cellBorder = activeTab === 'xai'
+                      ? `rgba(16, 185, 129, ${0.15 + importance * 0.35})`
+                      : undefined;
 
                     return (
                       <div
                         key={idx}
-                        onMouseEnter={() => setHoveredResidue({ index: idx, aa: char, q3, q8, q3_prob, q8_prob, conf })}
+                        onMouseEnter={() => setHoveredResidue({ index: idx, aa: char, q3, q8, q3_prob, q8_prob, conf, importance })}
                         className={`flex flex-col items-center justify-center p-1.5 w-11 rounded-lg border text-center transition-all cursor-default select-none ${
                           isHovered ? 'scale-110 shadow-lg border-purple-500 ring-2 ring-purple-500/20' : 'border-slate-800'
                         }`}
+                        style={activeTab === 'xai' ? { backgroundColor: cellBg, borderColor: cellBorder } : {}}
                       >
                         <span className="text-[10px] text-slate-500 font-bold leading-none">{idx + 1}</span>
                         <span className="text-sm font-bold text-white font-mono my-0.5">{char}</span>
@@ -306,6 +315,14 @@ export const Predict: React.FC = () => {
                         <span>Q3 Class: <span className="text-amber-400">{hoveredResidue.q3}</span></span>
                         <span>Q8 Class: <span className="text-sky-400">{hoveredResidue.q8}</span></span>
                       </div>
+                      {hoveredResidue.importance !== undefined && activePrediction.residue_importance && (
+                        <div className="text-[10px] font-semibold text-slate-400 mt-1.5 flex items-center gap-1.5">
+                          <span>Attribution Score:</span>
+                          <span className="text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded font-mono">
+                            {hoveredResidue.importance.toFixed(4)}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 

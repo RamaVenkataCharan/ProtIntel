@@ -51,8 +51,8 @@ async def upload_fasta(file: UploadFile = File(...)) -> BatchPredictResponse:
 
     results: list[PredictResponse] = []
     for record in records:
-        result = svc.predict(sequence=record.sequence)
-        result["protein_id"] = record.protein_id
+        result = svc.predict(sequence=record["sequence"])
+        result["protein_id"] = record["id"]
         results.append(PredictResponse(**result))
 
     total_ms = (time.time() - start) * 1000
