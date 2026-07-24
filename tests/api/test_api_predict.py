@@ -32,7 +32,11 @@ def real_client():
 def test_real_prediction_non_trivial(real_client):
     # Test with a real valid sequence (human myoglobin fragment or similar)
     sequence = "MGLSDGEWQLVLNVWGKVEADIPGHGQEVLIRLFKGHPETLEKFDKFKHLKSEDEMKASE"
-    resp = real_client.post("/predict", json={"sequence": sequence})
+    resp = real_client.post("/predict", json={
+        "sequence": sequence,
+        "return_xai": True,
+        "xai_method": "ig"
+    })
     assert resp.status_code == 200
     
     data = resp.json()
@@ -45,7 +49,6 @@ def test_real_prediction_non_trivial(real_client):
     assert len(q8_preds) == len(sequence)
     
     # Assert predictions are non-trivial (not collapsed to majority-class only)
-    # The collapsed model predicts only Coil ('C') for Q3 or Turn ('T')/Coil ('C') for Q8
     q3_set = set(q3_preds)
     q8_set = set(q8_preds)
     
@@ -55,3 +58,17 @@ def test_real_prediction_non_trivial(real_client):
     # Ensure prediction contains Helix ('H') or Sheet ('E')
     assert any(c in q3_set for c in ("H", "E")), f"Q3 prediction collapsed: {q3_preds}"
     assert any(c in q8_set for c in ("H", "E")), f"Q8 prediction collapsed: {q8_preds}"
+
+    # Verify XAI Attributions
+    assert "residue_importance" in data
+    importance = data["residue_importance"]
+    assert importance is not None
+    assert len(importance) == len(sequence)
+    
+    # Check that attributions are non-degenerate (not all identical, not all zero)
+    assert len(set(importance)) > 1, "Attribution scores are degenerate (all identical)"
+    assert any(score > 0 for score in importance), "Attribution scores are all zero"
+    
+    # Check they are normalized within 0 to 1 range
+    assert all(0.0 <= score <= 1.0 for score in importance), "Attribution scores not normalized to [0, 1]"
+

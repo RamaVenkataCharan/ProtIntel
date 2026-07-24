@@ -331,3 +331,31 @@ class TestBatchPredict:
         """Missing `sequences` field returns 422."""
         resp = client.post("/predict_batch", json={})
         assert resp.status_code == 422, resp.text
+
+
+class TestUploadPredict:
+    """Tests for the /upload endpoint."""
+
+    def test_upload_fasta_valid(self, client: TestClient) -> None:
+        """Uploading a valid FASTA file returns 200 with batch predictions."""
+        fasta_content = ">seq1\nACDEFGHIKL\n>seq2\nMNPQRSTVWY\n"
+        files = {"file": ("proteins.fasta", fasta_content, "text/plain")}
+        resp = client.post("/upload", files=files)
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["total_sequences"] == 2
+        assert len(data["results"]) == 2
+        assert data["results"][0]["protein_id"] == "seq1"
+        assert data["results"][0]["sequence"] == "ACDEFGHIKL"
+
+    def test_upload_fasta_invalid_extension(self, client: TestClient) -> None:
+        """Uploading a file with an invalid extension returns 400."""
+        files = {"file": ("proteins.pdf", "some content", "application/pdf")}
+        resp = client.post("/upload", files=files)
+        assert resp.status_code == 400, resp.text
+
+    def test_upload_fasta_empty(self, client: TestClient) -> None:
+        """Uploading an empty file returns 400."""
+        files = {"file": ("proteins.fasta", "", "text/plain")}
+        resp = client.post("/upload", files=files)
+        assert resp.status_code == 400, resp.text

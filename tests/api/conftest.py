@@ -242,8 +242,8 @@ def client(tiny_service: _TinyInferenceService) -> Generator[TestClient, None, N
     setting the global inference service.
     """
     app.router.on_startup.clear()
-    set_inference_service(tiny_service)
     with TestClient(app, raise_server_exceptions=True) as c:
+        set_inference_service(tiny_service)
         yield c
 
 
