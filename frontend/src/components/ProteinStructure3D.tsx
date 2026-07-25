@@ -4,6 +4,7 @@ import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { ProteinRibbon } from './ProteinRibbon';
 import { RotateCcw, Compass, HelpCircle } from 'lucide-react';
+import { STRUCTURE_COLORS, NEUTRAL_COLORS } from '../utils/colors';
 
 interface ProteinStructure3DProps {
   sequence: string | null;
@@ -73,7 +74,7 @@ const LoadingRibbon: React.FC = () => {
   const tempPosition = new THREE.Vector3();
   const tempRotation = new THREE.Quaternion();
   const tempScale = new THREE.Vector3();
-  const tempColor = new THREE.Color('#64748B'); // Coil Slate
+  const tempColor = new THREE.Color(NEUTRAL_COLORS.loadingHex); // Loading/Neutral Indigo color
   const zAxis = new THREE.Vector3(0, 0, 1);
 
   useFrame((state) => {
@@ -276,18 +277,12 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
       {hasData && !isPredicting && (
         <div className="bg-slate-950 border-t border-slate-900 px-4 py-2 flex items-center justify-between text-[10px] text-slate-500 font-semibold select-none">
           <div className="flex gap-4">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#E76F51]" />
-              <span>Helix (H)</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#2A9D8F]" />
-              <span>Beta Sheet (E)</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#64748B]" />
-              <span>Coil (C)</span>
-            </span>
+            {Object.entries(STRUCTURE_COLORS).map(([key, config]) => (
+              <span key={key} className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: config.hex }} />
+                <span>{config.label}</span>
+              </span>
+            ))}
           </div>
 
           <span className="font-mono text-purple-400">
