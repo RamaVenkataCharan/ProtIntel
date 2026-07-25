@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { usePredictionStore } from '../store/usePredictionStore';
 import { useModelStore } from '../store/useModelStore';
 import { AttentionHeatmap } from '../components/AttentionHeatmap';
+import { ProteinStructure3D } from '../components/ProteinStructure3D';
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip as ChartTooltip, CartesianGrid } from 'recharts';
 import { Activity, Play, AlertCircle, Info, HelpCircle } from 'lucide-react';
 
@@ -16,6 +17,22 @@ export const Predict: React.FC = () => {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'confidence' | 'attention' | 'xai'>('overview');
   const [hoveredResidue, setHoveredResidue] = useState<{ index: number; aa: string; q3: string; q8: string; q3_prob: number[]; q8_prob: number[]; conf: number; importance?: number } | null>(null);
+
+  // Helper to set hovered residue details based on index (used by 3D and Heatmap)
+  const setHoveredResidueByIndex = (idx: number | null) => {
+    if (idx === null || !activePrediction) {
+      setHoveredResidue(null);
+      return;
+    }
+    const char = activePrediction.sequence[idx];
+    const q3 = activePrediction.q3_prediction[idx];
+    const q8 = activePrediction.q8_prediction[idx];
+    const conf = activePrediction.confidence[idx];
+    const q3_prob = activePrediction.q3_probabilities[idx];
+    const q8_prob = activePrediction.q8_probabilities[idx];
+    const importance = activePrediction.residue_importance?.[idx] || 0;
+    setHoveredResidue({ index: idx, aa: char, q3, q8, q3_prob, q8_prob, conf, importance });
+  };
 
   // Validate sequence character and length constraints
   const handleSequenceChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -222,36 +239,49 @@ export const Predict: React.FC = () => {
 
         {/* Right Columns: Inference Results */}
         <div className="lg:col-span-2 flex flex-col gap-6">
-          {activePrediction ? (
+          {activePrediction || isPredicting ? (
             <section className="bg-[#0f172a]/30 border border-slate-900 rounded-3xl p-6 flex flex-col gap-6 relative overflow-hidden">
               {/* Header Stats */}
               <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
                 <div>
                   <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Prediction Results</span>
                   <h4 className="text-sm font-bold text-slate-300 font-mono mt-0.5 truncate max-w-[280px]">
-                    ID: {activePrediction.protein_id}
+                    ID: {activePrediction?.protein_id || 'Generating ID...'}
                   </h4>
                 </div>
 
                 <div className="flex gap-4">
                   <div className="text-right">
                     <span className="text-[10px] text-slate-400 font-semibold uppercase">Length</span>
-                    <p className="text-sm font-bold text-slate-200 mt-0.5">{activePrediction.length} AAs</p>
+                    <p className="text-sm font-bold text-slate-200 mt-0.5">{activePrediction?.length || '-'} AAs</p>
                   </div>
                   <div className="text-right">
                     <span className="text-[10px] text-slate-400 font-semibold uppercase">Latency</span>
-                    <p className="text-sm font-bold text-slate-200 mt-0.5">{activePrediction.processing_time_ms} ms</p>
+                    <p className="text-sm font-bold text-slate-200 mt-0.5">{activePrediction?.processing_time_ms || '-'} ms</p>
                   </div>
                   <div className="text-right">
                     <span className="text-[10px] text-slate-400 font-semibold uppercase">Avg Confidence</span>
                     <p className="text-sm font-bold text-slate-200 mt-0.5">
-                      {(activePrediction.confidence.reduce((a, b) => a + b, 0) / activePrediction.length * 100).toFixed(0)}%
+                      {activePrediction
+                        ? `${(activePrediction.confidence.reduce((a, b) => a + b, 0) / activePrediction.length * 100).toFixed(0)}%`
+                        : '-'}
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Grid Residue Map */}
+              {/* 3D Protein Structure Viewer */}
+              <ProteinStructure3D
+                sequence={activePrediction?.sequence ?? null}
+                q3Prediction={activePrediction?.q3_prediction ?? null}
+                confidence={activePrediction?.confidence ?? null}
+                hoveredIndex={hoveredResidue?.index ?? null}
+                isPredicting={isPredicting}
+              />
+
+              {activePrediction && (
+                <>
+                  {/* Grid Residue Map */}
               <div>
                 <h5 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
                   Sequence Structure Layout
@@ -436,7 +466,11 @@ export const Predict: React.FC = () => {
                   )}
 
                   {activeTab === 'attention' && activePrediction.attention_map && (
-                    <AttentionHeatmap attentionMap={activePrediction.attention_map} sequence={activePrediction.sequence} />
+                    <AttentionHeatmap
+                      attentionMap={activePrediction.attention_map}
+                      sequence={activePrediction.sequence}
+                      onHoverResidue={setHoveredResidueByIndex}
+                    />
                   )}
 
                   {activeTab === 'xai' && activePrediction.residue_importance && (
@@ -458,6 +492,8 @@ export const Predict: React.FC = () => {
                   )}
                 </div>
               </div>
+            </>
+          )}
             </section>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-800 rounded-3xl p-12 text-center text-slate-500">
