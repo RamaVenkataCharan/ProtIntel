@@ -62,7 +62,37 @@ class InferenceService:
                 map_location=self.device,
                 weights_only=False,
             )
-            self.model.load_state_dict(checkpoint["model_state_dict"])
+            result = self.model.load_state_dict(
+                checkpoint["model_state_dict"], strict=False
+            )
+            # Validate key alignment — ESM-2 backbone keys are expected
+            # to differ when loaded from HuggingFace separately.
+            # Keys may appear under _model. or esm2_model. and rotary
+            # embeddings are non-persistent buffers.
+            if result.missing_keys:
+                non_esm_missing = [
+                    k for k in result.missing_keys
+                    if not (
+                        k.startswith("embedding_generator._model.")
+                        or k.startswith("embedding_generator.esm2_model.")
+                        or "rotary_embeddings" in k
+                    )
+                ]
+                if non_esm_missing:
+                    logger.error(
+                        f"CRITICAL: {len(non_esm_missing)} downstream model "
+                        f"keys missing from checkpoint: {non_esm_missing[:10]}"
+                    )
+                    raise RuntimeError(
+                        f"Checkpoint architecture mismatch: "
+                        f"{len(non_esm_missing)} required keys missing. "
+                        f"First 5: {non_esm_missing[:5]}"
+                    )
+            if result.unexpected_keys:
+                logger.warning(
+                    f"{len(result.unexpected_keys)} unexpected keys in "
+                    f"checkpoint (ignored): {result.unexpected_keys[:10]}"
+                )
             logger.info(f"Loaded checkpoint from {self._checkpoint_path}")
         else:
             logger.warning(
