@@ -53,6 +53,9 @@ class InferenceService:
         """Load the model from checkpoint."""
         self.model = ProtIntelModel(config=self.config, device=self.device)
 
+        # Force load ESM-2 model so its parameters are registered prior to state_dict loading
+        self.model.embedding_generator._load_model()
+
         if self._checkpoint_path and Path(self._checkpoint_path).exists():
             checkpoint = torch.load(
                 str(self._checkpoint_path),
