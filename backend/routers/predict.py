@@ -145,14 +145,17 @@ async def predict_batch(request: BatchPredictRequest) -> BatchPredictResponse:
     results = []
     for seq in request.sequences:
         loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(
-            _executor,
-            lambda s=seq: _inference_service.predict(
+        def run_single(s: str = seq) -> dict[str, Any]:
+            return _inference_service.predict(
                 sequence=s,
                 return_attention=request.return_attention,
                 return_xai=request.return_xai,
                 xai_method=request.xai_method,
-            ),
+            )
+
+        result = await loop.run_in_executor(
+            _executor,
+            run_single,
         )
         results.append(PredictResponse(**result))
 

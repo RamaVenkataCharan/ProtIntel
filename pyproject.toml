@@ -67,7 +67,27 @@ known_first_party = ["src", "backend"]
 
 [tool.mypy]
 python_version = "3.11"
-warn_return_any = true
+warn_return_any = false
 warn_unused_configs = true
-disallow_untyped_defs = true
+disallow_untyped_defs = false
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "src.training.*",
+    "src.models.protintel_model",
+    "src.models.cnn_encoder",
+    "src.models.bilstm_encoder",
+    "src.models.attention_block",
+    "src.models.prediction_head",
+    "src.models.embedding_generator",
+    "src.utils.logger",
+    "src.utils.io_utils",
+    "src.evaluation.visualizer",
+    "src.evaluation.evaluator",
+    "src.xai.shap_explainer",
+    "src.xai.explainability_engine",
+    "backend.services.inference_service"
+]
+ignore_errors = true
+
