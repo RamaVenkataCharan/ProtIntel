@@ -7,7 +7,7 @@ data:
   raw_dir: datasets/raw
   processed_dir: datasets/processed
   embeddings_dir: datasets/processed/embeddings_650m
-  max_samples: 60
+  # max_samples: 60
 
   # ────────────────────────────────────────────────────────────────
   # Dataset file names (relative to raw_dir)

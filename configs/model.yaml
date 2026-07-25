@@ -6,7 +6,7 @@ model:
     model_name: "facebook/esm2_t33_650M_UR50D"
     embedding_dim: 1280
     freeze: true                    # Freeze all ESM-2 parameters
-    finetune_last_n_layers: 3       # Number of last transformer layers to unfreeze (0 = fully frozen)
+    finetune_last_n_layers: 0       # Number of last transformer layers to unfreeze (0 = fully frozen)
 
   # Multi-scale CNN encoder
   cnn:

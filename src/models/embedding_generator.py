@@ -1,6 +1,6 @@
 """ESM-2 embedding generator for protein sequences.
 
-Wraps the facebook/esm2_t12_35M_UR50D model to produce per-residue
+Wraps the facebook/esm2_t33_650M_UR50D model to produce per-residue
 embeddings of shape (L, 480). Supports frozen mode, partial fine-tuning,
 batch processing, and disk caching.
 """
@@ -41,8 +41,8 @@ class EmbeddingGenerator(nn.Module):
 
     def __init__(
         self,
-        model_name: str = "facebook/esm2_t12_35M_UR50D",
-        embedding_dim: int = 480,
+        model_name: str = "facebook/esm2_t33_650M_UR50D",
+        embedding_dim: int = 1280,
         freeze: bool = True,
         finetune_last_n_layers: int = 0,
         cache_dir: Optional[str | Path] = None,
@@ -345,6 +345,6 @@ class EmbeddingGenerator(nn.Module):
         """Return the output embedding dimension.
 
         Returns:
-            The embedding dimension (480 for esm2_t12_35M_UR50D).
+            The embedding dimension (1280 for esm2_t33_650M_UR50D).
         """
         return self.embedding_dim

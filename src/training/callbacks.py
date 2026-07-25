@@ -170,12 +170,18 @@ class ModelCheckpoint:
                 should_save = True
 
         if should_save:
-            # Save checkpoint
+            # Save checkpoint with provenance metadata
             checkpoint = {
                 "epoch": epoch,
                 "model_state_dict": model.state_dict(),
                 "metrics": metrics,
                 self.monitor: current,
+                "provenance": {
+                    "num_training_samples": getattr(
+                        self, "_num_training_samples", None
+                    ),
+                    "dataset_path": getattr(self, "_dataset_path", None),
+                },
             }
             if optimizer is not None:
                 checkpoint["optimizer_state_dict"] = optimizer.state_dict()

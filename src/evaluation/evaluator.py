@@ -65,7 +65,46 @@ class Evaluator:
         checkpoint = torch.load(
             str(checkpoint_path), map_location=device, weights_only=False
         )
-        model.load_state_dict(checkpoint["model_state_dict"], strict=False)
+        result = model.load_state_dict(
+            checkpoint["model_state_dict"], strict=False
+        )
+
+        # Log mismatched keys so architecture mismatches are visible
+        if result.missing_keys:
+            # Filter out ESM-2 backbone keys — these are expected to be
+            # missing when the model loads ESM-2 from HuggingFace separately.
+            # Keys may appear under either _model. or esm2_model. depending on
+            # the code version, and rotary_embeddings are non-persistent buffers.
+            non_esm_missing = [
+                k for k in result.missing_keys
+                if not (
+                    k.startswith("embedding_generator._model.")
+                    or k.startswith("embedding_generator.esm2_model.")
+                    or "rotary_embeddings" in k
+                )
+            ]
+            if non_esm_missing:
+                logger.error(
+                    f"CRITICAL: {len(non_esm_missing)} downstream model keys "
+                    f"missing from checkpoint (architecture mismatch?): "
+                    f"{non_esm_missing[:10]}"
+                )
+                raise RuntimeError(
+                    f"Checkpoint architecture mismatch: {len(non_esm_missing)} "
+                    f"required model keys are missing from the checkpoint. "
+                    f"First 5: {non_esm_missing[:5]}"
+                )
+            else:
+                logger.debug(
+                    f"{len(result.missing_keys)} ESM-2 backbone keys not in "
+                    f"checkpoint (loaded from HuggingFace instead)"
+                )
+        if result.unexpected_keys:
+            logger.warning(
+                f"{len(result.unexpected_keys)} unexpected keys in checkpoint "
+                f"(ignored): {result.unexpected_keys[:10]}"
+            )
+
         logger.info(f"Loaded checkpoint from {checkpoint_path}")
 
         if "metrics" in checkpoint:
