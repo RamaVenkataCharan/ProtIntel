@@ -77,12 +77,14 @@ class DatasetSpec(NamedTuple):
             or ``None`` if the checksum is not known and should be
             computed after first download.
         description: Short description of the dataset.
+        fallback_url: Alternative mirror URL if the primary URL fails.
     """
     name: str
     url: str
     filename: str
     sha256: str | None
     description: str
+    fallback_url: str | None = None
 
 
 DATASETS: list[DatasetSpec] = [
@@ -96,6 +98,7 @@ DATASETS: list[DatasetSpec] = [
         filename="cullpdb+profile_6133_filtered.npy.gz",
         sha256=None,  # Checksum verified after first successful download
         description="Training set with 6133 non-redundant protein chains.",
+        fallback_url="https://lbs.cent.uw.edu.pl/static/pipred/cullpdb%2Bprofile_6133_filtered_updated.npy.gz",
     ),
     DatasetSpec(
         name="CB513 (513 proteins)",
@@ -107,17 +110,17 @@ DATASETS: list[DatasetSpec] = [
         filename="cb513+profile_split1.npy.gz",
         sha256=None,
         description="Independent test set with 513 protein chains.",
+        fallback_url="https://lbs.cent.uw.edu.pl/static/pipred/cb513%2Bprofile_split1_updated.npy.gz",
     ),
     DatasetSpec(
         name="RS126 (126 proteins)",
         url=(
-            "https://web.archive.org/web/20221017031809/"
-            "https://www.princeton.edu/~jzthree/datasets/ICML2014/"
-            "rs126+profile_split1.npy.gz"
+            "https://web.archive.org/web/20210515153205id_/https://www.princeton.edu/~jzthree/datasets/ICML2014/rs126+profile.npy.gz"
         ),
-        filename="rs126+profile_split1.npy.gz",
+        filename="rs126+profile.npy.gz",
         sha256=None,
         description="Validation set with 126 protein chains.",
+        fallback_url=None,
     ),
 ]
 
@@ -165,6 +168,48 @@ def verify_checksum(filepath: Path, expected_sha256: str | None) -> bool:
     return actual == expected_sha256
 
 
+def check_gzip_magic_bytes(filepath: Path) -> bool:
+    """Check if a file has the valid gzip magic bytes (0x1f 0x8b)."""
+    if not filepath.exists():
+        return False
+    try:
+        with open(filepath, "rb") as f:
+            header = f.read(2)
+            return header == b"\x1f\x8b"
+    except Exception:
+        return False
+
+
+def check_npy_magic_bytes(filepath: Path) -> bool:
+    """Check if a file has the valid numpy magic bytes (\\x93NUMPY)."""
+    if not filepath.exists():
+        return False
+    try:
+        with open(filepath, "rb") as f:
+            header = f.read(6)
+            return header == b"\x93NUMPY"
+    except Exception:
+        return False
+
+
+def check_file_sanity(filepath: Path, min_size_mb: float = 1.0) -> bool:
+    """Perform basic integrity checks on the downloaded file."""
+    if not filepath.exists():
+        return False
+    # Check size
+    size_mb = filepath.stat().st_size / (1024 * 1024)
+    if size_mb < min_size_mb:
+        print(f"   [WARN] File {filepath.name} is too small: {size_mb:.3f} MB (min expected: {min_size_mb} MB)")
+        return False
+    # Check if gzip or numpy magic
+    is_gzip = check_gzip_magic_bytes(filepath)
+    is_npy = check_npy_magic_bytes(filepath)
+    if not (is_gzip or is_npy):
+        print(f"   [WARN] File {filepath.name} is neither valid gzip nor valid numpy.")
+        return False
+    return True
+
+
 def download_file(
     url: str,
     dest: Path,
@@ -188,8 +233,12 @@ def download_file(
     # Use a temporary file to avoid partial downloads
     tmp_dest = dest.with_suffix(dest.suffix + ".tmp")
 
+    # Suppress SSL verification warnings
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
     try:
-        response = requests.get(url, stream=True, timeout=120)
+        response = requests.get(url, stream=True, timeout=120, verify=False)
         response.raise_for_status()
 
         total_size = int(response.headers.get("content-length", 0))
@@ -239,8 +288,8 @@ def download_all_datasets(
 ) -> dict[str, bool]:
     """Download all benchmark datasets.
 
-    Skips files that already exist with matching checksums unless
-    ``force=True`` is specified.
+    Skips files that already exist with matching checksums and valid
+    integrity unless ``force=True`` is specified.
 
     Args:
         output_dir: Directory to save downloaded files. Created if
@@ -267,11 +316,13 @@ def download_all_datasets(
         print(f"[+] {spec.name}")
         print(f"   {spec.description}")
 
+        min_size = 5.0 if "cb513" in spec.filename or "rs126" in spec.filename else 90.0
+
         # Check if file already exists
         if dest.exists() and not force:
-            if verify_checksum(dest, spec.sha256):
+            if check_file_sanity(dest, min_size) and verify_checksum(dest, spec.sha256):
                 size_mb = dest.stat().st_size / (1024 * 1024)
-                print(f"   [OK] Already exists ({size_mb:.1f} MB), skipping.")
+                print(f"   [OK] Already exists and is valid ({size_mb:.1f} MB), skipping.")
                 actual_hash = compute_sha256(dest)
                 print(f"   SHA-256: {actual_hash[:16]}...")
                 results[spec.name] = True
@@ -279,10 +330,10 @@ def download_all_datasets(
                 continue
             else:
                 print(
-                    "   [WARN] File exists but checksum mismatch. Re-downloading..."
+                    "   [WARN] File exists but is invalid or checksum mismatch. Re-downloading..."
                 )
 
-        # Download
+        # Download from primary URL
         print(f"   Downloading from: {spec.url}")
         success = download_file(
             url=spec.url,
@@ -290,7 +341,7 @@ def download_all_datasets(
             description=spec.name,
         )
 
-        if success:
+        if success and check_file_sanity(dest, min_size):
             size_mb = dest.stat().st_size / (1024 * 1024)
             actual_hash = compute_sha256(dest)
             print(f"   [OK] Downloaded successfully ({size_mb:.1f} MB)")
@@ -305,10 +356,31 @@ def download_all_datasets(
                     success = False
                 else:
                     print("   [OK] Checksum verified.")
+            results[spec.name] = success
         else:
-            print(f"   [FAIL] Failed to download {spec.name}")
+            success = False
 
-        results[spec.name] = success
+        # Fallback to Warsaw mirror if primary failed and fallback exists
+        if not success and spec.fallback_url is not None:
+            print(f"   [WARN] Primary download failed. Falling back to Warsaw mirror...")
+            print(f"   Downloading from: {spec.fallback_url}")
+            success = download_file(
+                url=spec.fallback_url,
+                dest=dest,
+                description=spec.name + " (Fallback)",
+            )
+            if success and check_file_sanity(dest, min_size):
+                size_mb = dest.stat().st_size / (1024 * 1024)
+                actual_hash = compute_sha256(dest)
+                print(f"   [OK] Downloaded from fallback successfully ({size_mb:.1f} MB)")
+                print(f"   SHA-256: {actual_hash[:16]}...")
+                results[spec.name] = True
+            else:
+                print(f"   [FAIL] Fallback download failed or invalid.")
+                results[spec.name] = False
+        else:
+            results[spec.name] = success
+
         print()
 
     # Summary
