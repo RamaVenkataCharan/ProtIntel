@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { generateProteinPath } from '../utils/pathGenerator';
+import { STRUCTURE_COLORS, NEUTRAL_COLORS } from '../utils/colors';
 
 interface ProteinRibbonProps {
   sequence: string;
@@ -45,11 +46,9 @@ export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
   }, [resetTrigger, reducedMotion]);
 
   // Color Palette Definitions
-  const colorHelix = new THREE.Color('#E76F51');  // Rust / Coral
-  const colorSheet = new THREE.Color('#2A9D8F');  // Teal
-  const colorCoil = new THREE.Color('#64748B');   // Charcoal Slate
-  const colorPulse = new THREE.Color('#A855F7');  // Attention Violet
-  const colorLowConf = new THREE.Color('#334155'); // Grey/slate base for desaturation
+  const colorNeutral = new THREE.Color(NEUTRAL_COLORS.loadingHex);
+  const colorPulse = new THREE.Color(NEUTRAL_COLORS.highlightHex);
+  const colorLowConf = new THREE.Color(NEUTRAL_COLORS.lowConfHex);
 
   // Temp objects for instance modifications (pre-allocated for performance)
   const tempMatrix = new THREE.Matrix4();
@@ -177,13 +176,12 @@ export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
       tempMatrix.compose(tempPosition, tempRotation, tempScale);
       mesh.setMatrixAt(i, tempMatrix);
 
-      // 4. Color & Material calculation
-      let baseColor = colorCoil;
-      if (q3 === 'H') baseColor = colorHelix;
-      else if (q3 === 'E') baseColor = colorSheet;
+      // 4. Color & Material calculation (Color interpolates during the fold reveal)
+      const q3Key = (q3 === 'H' || q3 === 'E' || q3 === 'C') ? q3 : 'C';
+      const finalColor = new THREE.Color(STRUCTURE_COLORS[q3Key].hex);
 
-      // Copy base color to work color
-      tempColor.copy(baseColor);
+      // Lerp from the neutral loading color to the final predicted structure color
+      tempColor.lerpColors(colorNeutral, finalColor, localReveal);
 
       // Confidence desaturation and pulsing logic
       if (conf < 0.70) {
