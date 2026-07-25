@@ -188,6 +188,7 @@ def main() -> None:
             processed_dir / "rs126_val.npy",
             raw_dir / "rs126+profile_split1.npy",
             raw_dir / "rs126+profile_split1.npy.gz",
+            raw_dir / "rs126+profile.npy.gz",
         ],
         "CB513 (test)": [
             processed_dir / "cb513_test.npy",
