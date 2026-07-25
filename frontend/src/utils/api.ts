@@ -61,6 +61,13 @@ export interface BatchPredictResponse {
   total_processing_time_ms: number;
 }
 
+export interface JobStatusResponse {
+  job_id: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  result?: PredictResponse;
+  error?: string;
+}
+
 // Proxied via Vite config to http://localhost:8000
 const API_BASE = '/api';
 
@@ -82,7 +89,7 @@ export async function fetchMetrics(): Promise<MetricsResponse> {
   return resp.json();
 }
 
-export async function predictSequence(req: PredictRequest): Promise<PredictResponse> {
+export async function predictSequence(req: PredictRequest): Promise<PredictResponse | JobStatusResponse> {
   const resp = await fetch(`${API_BASE}/predict`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -93,6 +100,12 @@ export async function predictSequence(req: PredictRequest): Promise<PredictRespo
     const message = errorData?.detail?.[0]?.msg || errorData?.detail || 'Inference failed';
     throw new Error(message);
   }
+  return resp.json();
+}
+
+export async function fetchJobStatus(jobId: string): Promise<JobStatusResponse> {
+  const resp = await fetch(`${API_BASE}/predict/jobs/${jobId}`);
+  if (!resp.ok) throw new Error('Failed to fetch job status');
   return resp.json();
 }
 
@@ -109,3 +122,4 @@ export async function predictBatch(req: BatchPredictRequest): Promise<BatchPredi
   }
   return resp.json();
 }
+

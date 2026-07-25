@@ -8,7 +8,7 @@ import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tool
 import { Activity, Play, AlertCircle, Info, HelpCircle } from 'lucide-react';
 
 export const Predict: React.FC = () => {
-  const { runPredict, activePrediction, isPredicting, predictionError } = usePredictionStore();
+  const { runPredict, activePrediction, isPredicting, predictionError, jobStatus } = usePredictionStore();
   const { modelLoaded } = useModelStore();
 
   const [sequence, setSequence] = useState(activePrediction?.sequence || '');
@@ -98,13 +98,13 @@ export const Predict: React.FC = () => {
     switch (char) {
       case 'H': return 'bg-blue-500/20 border-blue-500/40 text-blue-400'; // Alpha helix (Blue)
       case 'G': return 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400';  // 3-10 helix (Cyan)
-      case 'I': return 'bg-indigo-500/20 border-indigo-500/40 text-indigo-400'; // Pi helix (Indigo)
+      case 'I': return 'bg-indigo-950/40 border-indigo-900/10 text-indigo-500/50 opacity-60'; // Pi helix (Muted)
       
       case 'E': return 'bg-orange-500/20 border-orange-500/40 text-orange-400'; // Beta strand (Orange)
-      case 'B': return 'bg-amber-600/20 border-amber-600/40 text-amber-500';  // Beta bridge (Amber)
+      case 'B': return 'bg-amber-950/40 border-amber-900/10 text-amber-500/50 opacity-60';  // Beta bridge (Muted)
       
       case 'T': return 'bg-slate-500/20 border-slate-500/40 text-slate-400'; // Turn (Light Grey)
-      case 'S': return 'bg-zinc-650/20 border-zinc-650/40 text-zinc-400';   // Bend (Darker Grey)
+      case 'S': return 'bg-zinc-900/40 border-zinc-800/10 text-zinc-550 opacity-60';   // Bend (Muted)
       case 'C':
       default: return 'bg-slate-700/20 border-slate-700/40 text-slate-400'; // Coil (Slate)
     }
@@ -223,7 +223,11 @@ export const Predict: React.FC = () => {
                 {isPredicting ? (
                   <>
                     <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    <span>Processing Sequence...</span>
+                    <span>
+                      {jobStatus === 'pending' && 'Job Queued...'}
+                      {jobStatus === 'processing' && 'Calculating XAI...'}
+                      {!jobStatus && 'Processing...'}
+                    </span>
                   </>
                 ) : (
                   <>
@@ -238,7 +242,21 @@ export const Predict: React.FC = () => {
 
         {/* Right Columns: Inference Results */}
         <div className="lg:col-span-2 flex flex-col gap-6">
-          {activePrediction || isPredicting ? (
+          {isPredicting ? (
+            <div className="flex-1 flex flex-col items-center justify-center border border-slate-800 bg-[#0f172a]/20 rounded-3xl p-12 text-center text-slate-500 min-h-[500px]">
+              <div className="h-10 w-10 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mb-4 animate-duration-1000"></div>
+              <h5 className="text-sm font-bold text-slate-200">
+                {jobStatus === 'pending' && 'Job in Queue'}
+                {jobStatus === 'processing' && 'Calculating Attribution Map'}
+                {!jobStatus && 'Predicting Secondary Structure'}
+              </h5>
+              <p className="text-xs text-slate-400 mt-2 max-w-sm mx-auto leading-relaxed">
+                {jobStatus === 'pending' && 'Your prediction job is queued. Live ESM-2 inference and attribution calculation run asynchronously to prevent API blockage.'}
+                {jobStatus === 'processing' && 'Running Integrated Gradients (50 interpolation steps). This process takes ~13 seconds on CPU.'}
+                {!jobStatus && 'Tokenizing amino acid sequence and running forward pass...'}
+              </p>
+            </div>
+          ) : activePrediction ? (
             <section className="bg-[#0f172a]/30 border border-slate-900 rounded-3xl p-6 flex flex-col gap-6 relative overflow-hidden">
               {/* Header Stats */}
               <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
@@ -339,7 +357,14 @@ export const Predict: React.FC = () => {
                     </div>
 
                     <div>
-                      <h6 className="text-xs font-bold text-slate-200">Confidence: {(hoveredResidue.conf * 100).toFixed(1)}%</h6>
+                      <h6 className="text-xs font-bold text-slate-200 flex items-center">
+                        Confidence: {(hoveredResidue.conf * 100).toFixed(1)}%
+                        {['I', 'B', 'S'].includes(hoveredResidue.q8) && (
+                          <span className="ml-2 text-[8px] bg-rose-500/10 border border-rose-500/20 text-rose-400 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider animate-pulse">
+                            Minority Class (Low Reliability)
+                          </span>
+                        )}
+                      </h6>
                       <div className="flex gap-3 text-[10px] font-semibold text-slate-400 mt-1">
                         <span>Q3 Class: <span className="text-amber-400">{hoveredResidue.q3}</span></span>
                         <span>Q8 Class: <span className="text-sky-400">{hoveredResidue.q8}</span></span>

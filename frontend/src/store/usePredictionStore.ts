@@ -1,11 +1,12 @@
 import { create } from 'zustand';
-import { predictSequence, predictBatch, type PredictRequest, type PredictResponse, type BatchPredictRequest, type BatchPredictResponse } from '../utils/api';
+import { predictSequence, predictBatch, fetchJobStatus, type PredictRequest, type PredictResponse, type BatchPredictRequest, type BatchPredictResponse } from '../utils/api';
 
 interface PredictionStoreState {
   history: PredictResponse[];
   activePrediction: PredictResponse | null;
   isPredicting: boolean;
   predictionError: string | null;
+  jobStatus: 'pending' | 'processing' | 'completed' | 'failed' | null;
   
   batchResults: BatchPredictResponse | null;
   isBatchPredicting: boolean;
@@ -41,24 +42,68 @@ export const usePredictionStore = create<PredictionStoreState>((set, get) => ({
   activePrediction: null,
   isPredicting: false,
   predictionError: null,
+  jobStatus: null,
   
   batchResults: null,
   isBatchPredicting: false,
   batchError: null,
 
   runPredict: async (req) => {
-    set({ isPredicting: true, predictionError: null });
+    set({ isPredicting: true, predictionError: null, jobStatus: null });
     try {
       const res = await predictSequence(req);
-      const updatedHistory = [res, ...get().history.filter(h => h.protein_id !== res.protein_id)].slice(0, 50);
       
-      set({
-        activePrediction: res,
-        history: updatedHistory,
-        isPredicting: false
-      });
-      saveHistory(updatedHistory);
-      return res;
+      // Check if this is an asynchronous job status response
+      if ('job_id' in res) {
+        const jobId = res.job_id;
+        set({ jobStatus: res.status });
+        
+        // Start polling for results
+        const maxAttempts = 120; // 60 seconds timeout at 500ms intervals
+        let attempts = 0;
+        
+        while (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const jobState = await fetchJobStatus(jobId);
+          set({ jobStatus: jobState.status });
+          
+          if (jobState.status === 'completed' && jobState.result) {
+            const finalResult = jobState.result;
+            const updatedHistory = [finalResult, ...get().history.filter(h => h.protein_id !== finalResult.protein_id)].slice(0, 50);
+            
+            set({
+              activePrediction: finalResult,
+              history: updatedHistory,
+              isPredicting: false,
+              jobStatus: 'completed'
+            });
+            saveHistory(updatedHistory);
+            return finalResult;
+          } else if (jobState.status === 'failed') {
+            const errMsg = jobState.error || 'Asynchronous prediction job failed';
+            set({ predictionError: errMsg, isPredicting: false, jobStatus: 'failed' });
+            throw new Error(errMsg);
+          }
+          
+          attempts++;
+        }
+        
+        const timeoutMsg = 'Attribution calculation timed out. Please try again.';
+        set({ predictionError: timeoutMsg, isPredicting: false, jobStatus: 'failed' });
+        throw new Error(timeoutMsg);
+      } else {
+        // Sync response
+        const updatedHistory = [res, ...get().history.filter(h => h.protein_id !== res.protein_id)].slice(0, 50);
+        
+        set({
+          activePrediction: res,
+          history: updatedHistory,
+          isPredicting: false,
+          jobStatus: 'completed'
+        });
+        saveHistory(updatedHistory);
+        return res;
+      }
     } catch (err: any) {
       set({ predictionError: err?.message || 'Prediction failed', isPredicting: false });
       throw err;
