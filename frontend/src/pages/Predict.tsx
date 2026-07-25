@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { usePredictionStore } from '../store/usePredictionStore';
 import { useModelStore } from '../store/useModelStore';
 import { AttentionHeatmap } from '../components/AttentionHeatmap';
-import { ProteinStructure3D } from '../components/ProteinStructure3D';
+
+const ProteinStructure3D = lazy(() => import('../components/ProteinStructure3D').then(m => ({ default: m.ProteinStructure3D })));
+
 import { STRUCTURE_COLORS } from '../utils/colors';
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip as ChartTooltip, CartesianGrid } from 'recharts';
 import { Activity, Play, AlertCircle, Info, HelpCircle } from 'lucide-react';
@@ -288,13 +290,20 @@ export const Predict: React.FC = () => {
               </div>
 
               {/* 3D Protein Structure Viewer */}
-              <ProteinStructure3D
-                sequence={activePrediction?.sequence ?? null}
-                q3Prediction={activePrediction?.q3_prediction ?? null}
-                confidence={activePrediction?.confidence ?? null}
-                hoveredIndex={hoveredResidue?.index ?? null}
-                isPredicting={isPredicting}
-              />
+              <Suspense fallback={
+                <div className="h-[400px] w-full flex flex-col items-center justify-center border border-slate-800 bg-slate-950/20 rounded-2xl text-slate-400">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#3A64E8] border-t-transparent mb-2"></div>
+                  <span className="text-xs font-semibold">Loading 3D Visualizer...</span>
+                </div>
+              }>
+                <ProteinStructure3D
+                  sequence={activePrediction?.sequence ?? null}
+                  q3Prediction={activePrediction?.q3_prediction ?? null}
+                  confidence={activePrediction?.confidence ?? null}
+                  hoveredIndex={hoveredResidue?.index ?? null}
+                  isPredicting={isPredicting}
+                />
+              </Suspense>
 
               {activePrediction && (
                 <>
