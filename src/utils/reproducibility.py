@@ -75,7 +75,7 @@ def get_device(device_str: str = "auto") -> torch.device:
     if device.type == "cuda":
         logger.info(f"  GPU: {torch.cuda.get_device_name(device)}")
         logger.info(
-            f"  VRAM: {torch.cuda.get_device_properties(device).total_mem / 1e9:.1f} GB"
+            f"  VRAM: {torch.cuda.get_device_properties(device).total_memory / 1e9:.1f} GB"
         )
 
     return device
