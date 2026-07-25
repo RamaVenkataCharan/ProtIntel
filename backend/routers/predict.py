@@ -6,11 +6,12 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 
 from backend.schemas.request import BatchPredictRequest, PredictRequest
 from backend.schemas.response import BatchPredictResponse, PredictResponse, JobStatusResponse
 from backend.services.job_manager import XAIJobManager
+from backend.middleware.rate_limit import rate_limit
 
 router = APIRouter(tags=["Prediction"])
 
@@ -35,7 +36,11 @@ def get_inference_service() -> Any:
     return _inference_service
 
 
-@router.post("/predict", response_model=PredictResponse | JobStatusResponse)
+@router.post(
+    "/predict",
+    response_model=PredictResponse | JobStatusResponse,
+    dependencies=[Depends(rate_limit(limit=10, period=60))],
+)
 async def predict(
     request: PredictRequest,
     background_tasks: BackgroundTasks,
@@ -111,7 +116,11 @@ async def predict(
     return response
 
 
-@router.get("/predict/jobs/{job_id}", response_model=JobStatusResponse)
+@router.get(
+    "/predict/jobs/{job_id}",
+    response_model=JobStatusResponse,
+    dependencies=[Depends(rate_limit(limit=120, period=60))],
+)
 async def get_job_status(job_id: str) -> JobStatusResponse:
     """Poll the status of an asynchronous prediction/XAI job."""
     job = job_manager.get_job(job_id)

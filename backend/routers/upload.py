@@ -46,6 +46,28 @@ async def upload_fasta(file: UploadFile = File(...)) -> BatchPredictResponse:
             detail=f"Too many sequences ({len(records)}). Maximum is 50.",
         )
 
+    import re
+    # Match standard amino acid letters plus common ambiguity/gap markers (X, B, Z, J, U, O, -)
+    AA_PATTERN = re.compile(r"^[ACDEFGHIKLMNPQRSTVWYXBZJUO\-]+$", re.IGNORECASE)
+
+    for record in records:
+        seq = record["sequence"].strip()
+        if len(seq) > 1024:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Sequence '{record['id']}' length ({len(seq)}) exceeds the maximum allowed limit of 1024.",
+            )
+        if len(seq) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Sequence '{record['id']}' is empty.",
+            )
+        if not AA_PATTERN.match(seq):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Sequence '{record['id']}' contains invalid characters. Only standard IUPAC amino acid codes are allowed.",
+            )
+
     import time
     start = time.time()
 
