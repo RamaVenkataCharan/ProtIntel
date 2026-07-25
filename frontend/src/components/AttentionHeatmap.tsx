@@ -3,9 +3,10 @@ import React, { useRef, useEffect, useState } from 'react';
 interface AttentionHeatmapProps {
   attentionMap: number[][];
   sequence: string;
+  onHoverResidue?: (index: number | null) => void;
 }
 
-export const AttentionHeatmap: React.FC<AttentionHeatmapProps> = ({ attentionMap, sequence }) => {
+export const AttentionHeatmap: React.FC<AttentionHeatmapProps> = ({ attentionMap, sequence, onHoverResidue }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hoveredCell, setHoveredCell] = useState<{ row: number; col: number; val: number } | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
@@ -53,13 +54,16 @@ export const AttentionHeatmap: React.FC<AttentionHeatmapProps> = ({ attentionMap
       const val = attentionMap[row]?.[col] || 0;
       setHoveredCell({ row, col, val });
       setTooltipPos({ x: e.clientX - rect.left + 15, y: e.clientY - rect.top + 15 });
+      onHoverResidue?.(col); // trigger 3D highlight on target column residue
     } else {
       setHoveredCell(null);
+      onHoverResidue?.(null);
     }
   };
 
   const handleMouseLeave = () => {
     setHoveredCell(null);
+    onHoverResidue?.(null);
   };
 
   return (
