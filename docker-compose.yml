@@ -1,0 +1,56 @@
+version: "3.8"
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: protintel-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+      args:
+        TORCH_VARIANT: cpu  # Set to gpu and enable deploy: resources: reservations: devices: for CUDA support
+    container_name: protintel-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models
+      - ./datasets:/app/datasets
+      - ./logs:/app/logs
+    environment:
+      - MODEL_PATH=/app/models/best_checkpoint_pruned.pt
+      - DEVICE=cpu
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    container_name: protintel-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
