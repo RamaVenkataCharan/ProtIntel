@@ -54,6 +54,8 @@ async def lifespan(app: FastAPI):
     yield
 
 
+from backend.middleware.structured_logging import StructuredLoggingMiddleware
+
 # Create FastAPI app
 app = FastAPI(
     title="ProtIntel API",
@@ -66,6 +68,9 @@ app = FastAPI(
     redoc_url="/redoc",
     lifespan=lifespan,
 )
+
+# Register structured JSON logger middleware
+app.add_middleware(StructuredLoggingMiddleware)
 
 # Configure CORS
 configure_cors(app)

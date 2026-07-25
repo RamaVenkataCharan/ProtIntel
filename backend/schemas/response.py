@@ -82,6 +82,7 @@ class HealthResponse(BaseModel):
     status: str = "healthy"
     model_loaded: bool
     device: str
+    redis_connected: Optional[bool] = None
 
 
 class JobStatusResponse(BaseModel):

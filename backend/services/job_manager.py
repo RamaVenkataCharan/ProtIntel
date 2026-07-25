@@ -96,16 +96,26 @@ class XAIJobManager:
                 cached_json = self.redis_client.get(f"cache:{key}")
                 if cached_json:
                     data = json.loads(cached_json)
-                    logger.info(f"Redis cache hit for key: {key}")
+                    logger.info(
+                        json.dumps({"event": "cache_hit", "key": key, "store": "redis"})
+                    )
                     return PredictResponse(**data)
             except Exception as e:
-                logger.error(f"Error reading from Redis cache: {e}")
+                logger.error(
+                    json.dumps(
+                        {"event": "cache_read_error", "key": key, "error": str(e)}
+                    )
+                )
 
         with self._lock:
             cached = self._cache.get(key)
             if cached is not None:
-                logger.info(f"Memory cache hit for key: {key}")
+                logger.info(
+                    json.dumps({"event": "cache_hit", "key": key, "store": "memory"})
+                )
                 return cached
+
+        logger.info(json.dumps({"event": "cache_miss", "key": key}))
         return None
 
     def cache_prediction(
@@ -123,14 +133,22 @@ class XAIJobManager:
             try:
                 # 24 hours TTL (86400 seconds)
                 self.redis_client.set(f"cache:{key}", json.dumps(result.model_dump()), ex=86400)
-                logger.info(f"Cached prediction in Redis under key: {key}")
+                logger.info(
+                    json.dumps({"event": "cache_save", "key": key, "store": "redis"})
+                )
                 return
             except Exception as e:
-                logger.error(f"Error writing to Redis cache: {e}")
+                logger.error(
+                    json.dumps(
+                        {"event": "cache_write_error", "key": key, "error": str(e)}
+                    )
+                )
 
         with self._lock:
             self._cache[key] = result
-            logger.info(f"Cached prediction under key: {key}")
+            logger.info(
+                json.dumps({"event": "cache_save", "key": key, "store": "memory"})
+            )
 
     def create_job(self, sequence: str) -> str:
         """Create a new job and return its job ID."""
@@ -146,14 +164,36 @@ class XAIJobManager:
             try:
                 # 30 minutes TTL
                 self.redis_client.set(f"job:{job_id}", json.dumps(job.model_dump()), ex=1800)
-                logger.info(f"Created XAI job {job_id} in Redis")
+                logger.info(
+                    json.dumps(
+                        {
+                            "event": "job_created",
+                            "job_id": job_id,
+                            "store": "redis",
+                            "sequence_length": len(sequence),
+                        }
+                    )
+                )
                 return job_id
             except Exception as e:
-                logger.error(f"Error creating job in Redis: {e}")
+                logger.error(
+                    json.dumps(
+                        {"event": "job_create_error", "job_id": job_id, "error": str(e)}
+                    )
+                )
 
         with self._lock:
             self._jobs[job_id] = job
-        logger.info(f"Created XAI job {job_id} in memory")
+        logger.info(
+            json.dumps(
+                {
+                    "event": "job_created",
+                    "job_id": job_id,
+                    "store": "memory",
+                    "sequence_length": len(sequence),
+                }
+            )
+        )
         return job_id
 
     def get_job(self, job_id: str) -> Optional[JobState]:
@@ -195,15 +235,37 @@ class XAIJobManager:
             try:
                 # Keep 30 min TTL on update
                 self.redis_client.set(f"job:{job_id}", json.dumps(job.model_dump()), ex=1800)
-                logger.info(f"Updated job {job_id} in Redis to status: {status}")
+                logger.info(
+                    json.dumps(
+                        {
+                            "event": "job_updated",
+                            "job_id": job_id,
+                            "store": "redis",
+                            "status": status,
+                        }
+                    )
+                )
                 return
             except Exception as e:
-                logger.error(f"Error updating job in Redis: {e}")
+                logger.error(
+                    json.dumps(
+                        {"event": "job_update_error", "job_id": job_id, "error": str(e)}
+                    )
+                )
 
         with self._lock:
             if job_id in self._jobs:
                 self._jobs[job_id] = job
-                logger.info(f"Updated job {job_id} in memory to status: {status}")
+                logger.info(
+                    json.dumps(
+                        {
+                            "event": "job_updated",
+                            "job_id": job_id,
+                            "store": "memory",
+                            "status": status,
+                        }
+                    )
+                )
 
     async def execute_job_async(
         self,
@@ -238,3 +300,23 @@ class XAIJobManager:
         except Exception as e:
             logger.error(f"Error executing job {job_id}: {e}", exc_info=True)
             self.update_job(job_id, "failed", error=str(e))
+
+    def get_queue_depth(self) -> int:
+        """Get the number of jobs currently pending or processing."""
+        if self.redis_client is not None:
+            try:
+                # Retrieve all job keys
+                keys = self.redis_client.keys("job:*")
+                count = 0
+                for k in keys:
+                    job_json = self.redis_client.get(k)
+                    if job_json:
+                        data = json.loads(job_json)
+                        if data.get("status") in ("pending", "processing"):
+                            count += 1
+                return count
+            except Exception as e:
+                logger.error(f"Error checking queue depth in Redis: {e}")
+
+        with self._lock:
+            return sum(1 for j in self._jobs.values() if j.status in ("pending", "processing"))
