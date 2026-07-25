@@ -210,6 +210,10 @@ class _TinyInferenceService:
             rollout = compute_attention_rollout(outputs["attention_weights"])
             result["attention_map"] = rollout[0, :seq_len, :seq_len].cpu().tolist()
 
+        if return_xai:
+            result["residue_importance"] = [0.5] * seq_len
+            result["xai_method"] = xai_method
+
         return result
 
     def get_model_info(self) -> dict[str, Any]:

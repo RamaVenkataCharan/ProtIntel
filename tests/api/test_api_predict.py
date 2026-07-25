@@ -30,6 +30,7 @@ def real_client():
         yield client
 
 def test_real_prediction_non_trivial(real_client):
+    import time
     # Test with a real valid sequence (human myoglobin fragment or similar)
     sequence = "MGLSDGEWQLVLNVWGKVEADIPGHGQEVLIRLFKGHPETLEKFDKFKHLKSEDEMKASE"
     resp = real_client.post("/predict", json={
@@ -39,7 +40,27 @@ def test_real_prediction_non_trivial(real_client):
     })
     assert resp.status_code == 200
     
-    data = resp.json()
+    job_data = resp.json()
+    assert "job_id" in job_data
+    job_id = job_data["job_id"]
+
+    # Poll until job completes
+    completed = False
+    data = None
+    for _ in range(30):  # Wait up to 15 seconds
+        poll_resp = real_client.get(f"/predict/jobs/{job_id}")
+        assert poll_resp.status_code == 200
+        poll_data = poll_resp.json()
+        if poll_data["status"] == "completed":
+            completed = True
+            data = poll_data["result"]
+            break
+        elif poll_data["status"] == "failed":
+            pytest.fail(f"Job failed: {poll_data['error']}")
+        time.sleep(0.5)
+
+    assert completed, f"Real XAI prediction job {job_id} timed out"
+    assert data is not None
     assert data["sequence"] == sequence
     
     q3_preds = data["q3_prediction"]
@@ -71,4 +92,5 @@ def test_real_prediction_non_trivial(real_client):
     
     # Check they are normalized within 0 to 1 range
     assert all(0.0 <= score <= 1.0 for score in importance), "Attribution scores not normalized to [0, 1]"
+
 
