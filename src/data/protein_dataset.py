@@ -257,21 +257,36 @@ class ProteinDataset(Dataset):
 
         # Reshape if necessary
         if data.ndim == 2:
-            num_samples = data.shape[0] // _NPY_SEQ_LEN
-            if data.shape[0] % _NPY_SEQ_LEN != 0:
-                # Try reshape assuming flat rows
-                total_features = data.shape[1]
-                if total_features == _NPY_SEQ_LEN * _NPY_FEATURE_DIM:
-                    data = data.reshape(-1, _NPY_SEQ_LEN, _NPY_FEATURE_DIM)
-                else:
-                    data = data.reshape(num_samples, _NPY_SEQ_LEN, _NPY_FEATURE_DIM)
+            num_cols = data.shape[1]
+            if num_cols % _NPY_SEQ_LEN == 0:
+                D = num_cols // _NPY_SEQ_LEN
+                data = data.reshape(-1, _NPY_SEQ_LEN, D)
+            elif data.shape[0] % _NPY_SEQ_LEN == 0:
+                N = data.shape[0] // _NPY_SEQ_LEN
+                D = data.shape[1]
+                data = data.reshape(N, _NPY_SEQ_LEN, D)
             else:
-                data = data.reshape(-1, _NPY_SEQ_LEN, _NPY_FEATURE_DIM)
+                raise ValueError(
+                    f"Cannot reshape 2D array of shape {data.shape} to (N, {_NPY_SEQ_LEN}, D)."
+                )
 
         if data.ndim != 3 or data.shape[1] != _NPY_SEQ_LEN:
             raise ValueError(
-                f"Expected array shape (N, {_NPY_SEQ_LEN}, {_NPY_FEATURE_DIM}), "
-                f"got {data.shape}."
+                f"Expected array with ndim=3 and seq_len={_NPY_SEQ_LEN}, got shape {data.shape}."
+            )
+
+        # Dynamic slicing indices based on feature dimension
+        feature_dim = data.shape[2]
+        if feature_dim == 57:
+            aa_start, aa_end = 0, 21
+            q8_start, q8_end = 22, 30
+        elif feature_dim == 56:
+            aa_start, aa_end = 0, 21
+            q8_start, q8_end = 21, 29
+        else:
+            raise ValueError(
+                f"Unexpected feature dimension: {feature_dim} in file {path.name}. "
+                f"Expected 56 or 57, got shape {data.shape}."
             )
 
         logger.info(f"Loaded NumPy array with shape {data.shape} from {path.name}")
@@ -287,13 +302,13 @@ class ProteinDataset(Dataset):
                 logger.info(f"Limited {self.split} split to {len(data)} samples for speed.")
 
         for idx in range(data.shape[0]):
-            sample = data[idx]  # shape: (700, 57)
+            sample = data[idx]  # shape: (700, 56 or 57)
 
             # Extract amino acid sequence from one-hot encoding (columns 0-20)
-            aa_onehot = sample[:, _AA_ONEHOT_START:_AA_ONEHOT_END]
+            aa_onehot = sample[:, aa_start:aa_end]
 
-            # Extract Q8 labels (columns 22-29)
-            q8_onehot = sample[:, _Q8_LABEL_START:_Q8_LABEL_END]
+            # Extract Q8 labels (columns 21-28 or 22-29)
+            q8_onehot = sample[:, q8_start:q8_end]
 
             # Find actual sequence length (where q8_onehot sum == 1.0)
             seq_mask = q8_onehot.sum(axis=1) == 1.0
