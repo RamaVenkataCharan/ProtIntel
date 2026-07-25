@@ -14,7 +14,7 @@ data:
   # ────────────────────────────────────────────────────────────────
   cullpdb_file: cullpdb+profile_6133_filtered.npy.gz
   cb513_file: cb513+profile_split1.npy.gz
-  rs126_file: cb513+profile_split1.npy.gz
+  rs126_file: rs126+profile.npy.gz
 
   splits:
     train: cullpdb
