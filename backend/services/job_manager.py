@@ -24,6 +24,16 @@ class JobState(BaseModel):
     completed_at: Optional[float] = None
 
 
+import os
+import json
+
+try:
+    import redis
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+
+
 class XAIJobManager:
     """Manages asynchronous XAI background tasks and response caching."""
 
@@ -31,6 +41,34 @@ class XAIJobManager:
         self._jobs: Dict[str, JobState] = {}
         self._cache: Dict[str, PredictResponse] = {}
         self._lock = Lock()
+
+        self.redis_client: Optional[redis.Redis] = None
+        redis_host = os.environ.get("REDIS_HOST")
+        redis_url = os.environ.get("REDIS_URL")
+
+        if (redis_host or redis_url) and REDIS_AVAILABLE:
+            try:
+                import redis as redis_lib
+                if redis_url:
+                    self.redis_client = redis_lib.Redis.from_url(redis_url)
+                else:
+                    port = int(os.environ.get("REDIS_PORT", 6379))
+                    db = int(os.environ.get("REDIS_DB", 0))
+                    self.redis_client = redis_lib.Redis(
+                        host=redis_host, port=port, db=db, decode_responses=True
+                    )
+                self.redis_client.ping()
+                logger.info("Successfully connected to Redis. Multi-worker safe state active.")
+            except Exception as e:
+                logger.warning(
+                    f"Failed to connect to Redis ({e}). Falling back to single-worker in-memory state."
+                )
+                self.redis_client = None
+        elif (redis_host or redis_url) and not REDIS_AVAILABLE:
+            logger.warning(
+                "Redis host configured but 'redis' package is not installed. "
+                "Falling back to single-worker in-memory state."
+            )
 
     def _get_cache_key(
         self,
@@ -52,10 +90,21 @@ class XAIJobManager:
     ) -> Optional[PredictResponse]:
         """Retrieve a cached prediction if available."""
         key = self._get_cache_key(sequence, return_attention, return_xai, xai_method)
+
+        if self.redis_client is not None:
+            try:
+                cached_json = self.redis_client.get(f"cache:{key}")
+                if cached_json:
+                    data = json.loads(cached_json)
+                    logger.info(f"Redis cache hit for key: {key}")
+                    return PredictResponse(**data)
+            except Exception as e:
+                logger.error(f"Error reading from Redis cache: {e}")
+
         with self._lock:
             cached = self._cache.get(key)
             if cached is not None:
-                logger.info(f"Cache hit for key: {key}")
+                logger.info(f"Memory cache hit for key: {key}")
                 return cached
         return None
 
@@ -69,6 +118,16 @@ class XAIJobManager:
     ) -> None:
         """Store a completed prediction in the cache."""
         key = self._get_cache_key(sequence, return_attention, return_xai, xai_method)
+
+        if self.redis_client is not None:
+            try:
+                # 24 hours TTL (86400 seconds)
+                self.redis_client.set(f"cache:{key}", json.dumps(result.model_dump()), ex=86400)
+                logger.info(f"Cached prediction in Redis under key: {key}")
+                return
+            except Exception as e:
+                logger.error(f"Error writing to Redis cache: {e}")
+
         with self._lock:
             self._cache[key] = result
             logger.info(f"Cached prediction under key: {key}")
@@ -82,13 +141,32 @@ class XAIJobManager:
             status="pending",
             created_at=time.time(),
         )
+
+        if self.redis_client is not None:
+            try:
+                # 30 minutes TTL
+                self.redis_client.set(f"job:{job_id}", json.dumps(job.model_dump()), ex=1800)
+                logger.info(f"Created XAI job {job_id} in Redis")
+                return job_id
+            except Exception as e:
+                logger.error(f"Error creating job in Redis: {e}")
+
         with self._lock:
             self._jobs[job_id] = job
-        logger.info(f"Created XAI job {job_id}")
+        logger.info(f"Created XAI job {job_id} in memory")
         return job_id
 
     def get_job(self, job_id: str) -> Optional[JobState]:
         """Get the state of a job."""
+        if self.redis_client is not None:
+            try:
+                job_json = self.redis_client.get(f"job:{job_id}")
+                if job_json:
+                    data = json.loads(job_json)
+                    return JobState(**data)
+            except Exception as e:
+                logger.error(f"Error reading job from Redis: {e}")
+
         with self._lock:
             return self._jobs.get(job_id)
 
@@ -100,19 +178,32 @@ class XAIJobManager:
         error: Optional[str] = None,
     ) -> None:
         """Update a job's status and results."""
+        job = self.get_job(job_id)
+        if job is None:
+            logger.warning(f"Attempted to update non-existent job {job_id}")
+            return
+
+        job.status = status
+        if result is not None:
+            job.result = result
+        if error is not None:
+            job.error = error
+        if status in ("completed", "failed"):
+            job.completed_at = time.time()
+
+        if self.redis_client is not None:
+            try:
+                # Keep 30 min TTL on update
+                self.redis_client.set(f"job:{job_id}", json.dumps(job.model_dump()), ex=1800)
+                logger.info(f"Updated job {job_id} in Redis to status: {status}")
+                return
+            except Exception as e:
+                logger.error(f"Error updating job in Redis: {e}")
+
         with self._lock:
             if job_id in self._jobs:
-                job = self._jobs[job_id]
-                job.status = status
-                if result is not None:
-                    job.result = result
-                if error is not None:
-                    job.error = error
-                if status in ("completed", "failed"):
-                    job.completed_at = time.time()
-                logger.info(f"Updated job {job_id} to status: {status}")
-            else:
-                logger.warning(f"Attempted to update non-existent job {job_id}")
+                self._jobs[job_id] = job
+                logger.info(f"Updated job {job_id} in memory to status: {status}")
 
     async def execute_job_async(
         self,
