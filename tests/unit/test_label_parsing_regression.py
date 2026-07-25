@@ -29,19 +29,20 @@ class TestLabelParsingRegression:
         assert _Q8_LABEL_START == 22, f"Expected _Q8_LABEL_START to be 22, got {_Q8_LABEL_START}"
         assert _Q8_LABEL_END == 30, f"Expected _Q8_LABEL_END to be 30, got {_Q8_LABEL_END}"
 
-    def test_synthetic_sample_q8_q3_parsing(self, tmp_path: Path):
-        """Assert a synthetic (1, 700, 57) sample with known 1-hot Q8 at cols 22-29 parses correctly."""
-        synth_data = np.zeros((1, 700, 57), dtype=np.float32)
+    @pytest.mark.parametrize("feature_dim", [56, 57])
+    def test_synthetic_sample_q8_q3_parsing(self, tmp_path: Path, feature_dim: int):
+        """Assert a synthetic (1, 700, feature_dim) sample with known 1-hot Q8 parses correctly."""
+        synth_data = np.zeros((1, 700, feature_dim), dtype=np.float32)
 
         # Set sequence length = 10 (fill amino acid one-hot at cols 0-20)
         seq_len = 10
         for i in range(seq_len):
             synth_data[0, i, 0] = 1.0  # Alanine (A)
 
-        # Assign specific Q8 classes at cols 22-29 for the 10 positions:
-        # Col 22 (L -> C), Col 23 (B -> E), Col 24 (E -> E), Col 25 (G -> H),
-        # Col 26 (I -> H), Col 27 (H -> H), Col 28 (S -> C), Col 29 (T -> C)
-        q8_col_sequence = [22, 23, 24, 25, 26, 27, 28, 29, 22, 27]  # L, B, E, G, I, H, S, T, L, H
+        # Assign specific Q8 classes at cols based on dimension:
+        # Col 22 (L -> C) for 57-dim, or Col 21 (L -> C) for 56-dim, etc.
+        offset = 22 if feature_dim == 57 else 21
+        q8_col_sequence = [offset + k for k in [0, 1, 2, 3, 4, 5, 6, 7, 0, 5]]  # L, B, E, G, I, H, S, T, L, H
         expected_q8_str = "CBEGIHSTCH"
         expected_q3_str = "CEEHHHCCCH"
 
@@ -49,7 +50,7 @@ class TestLabelParsingRegression:
             synth_data[0, i, col] = 1.0
 
         # Save synthetic array to file
-        npy_file = tmp_path / "test_synthetic_cullpdb.npy"
+        npy_file = tmp_path / f"test_synthetic_cullpdb_{feature_dim}.npy"
         np.save(str(npy_file), synth_data)
 
         # Load with ProteinDataset
