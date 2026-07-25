@@ -3,6 +3,7 @@ import { usePredictionStore } from '../store/usePredictionStore';
 import { useModelStore } from '../store/useModelStore';
 import { AttentionHeatmap } from '../components/AttentionHeatmap';
 import { ProteinStructure3D } from '../components/ProteinStructure3D';
+import { STRUCTURE_COLORS } from '../utils/colors';
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip as ChartTooltip, CartesianGrid } from 'recharts';
 import { Activity, Play, AlertCircle, Info, HelpCircle } from 'lucide-react';
 
@@ -87,27 +88,25 @@ export const Predict: React.FC = () => {
     }
   };
 
-  // Helper: map secondary structure labels to Tailwind bg colors
+  // Helper: map secondary structure labels to Tailwind bg colors (driven by colors.ts)
   const getQ3ColorClass = (char: string) => {
-    switch (char) {
-      case 'H': return 'bg-amber-500/20 border-amber-500/40 text-amber-400';
-      case 'E': return 'bg-blue-500/20 border-blue-500/40 text-blue-400';
-      case 'C': return 'bg-slate-700/20 border-slate-700/40 text-slate-400';
-      default: return 'bg-slate-800 border-slate-700 text-slate-500';
-    }
+    const q3 = (char === 'H' || char === 'E' || char === 'C') ? char : 'C';
+    return STRUCTURE_COLORS[q3].bgClass;
   };
 
   const getQ8ColorClass = (char: string) => {
     switch (char) {
-      case 'H': return 'bg-orange-500/25 border-orange-500/45 text-orange-400';
-      case 'E': return 'bg-sky-500/25 border-sky-500/45 text-sky-400';
-      case 'G': return 'bg-yellow-500/25 border-yellow-500/45 text-yellow-400';
-      case 'I': return 'bg-red-500/25 border-red-500/45 text-red-400';
-      case 'B': return 'bg-indigo-500/25 border-indigo-500/45 text-indigo-400';
-      case 'T': return 'bg-purple-500/25 border-purple-500/45 text-purple-400';
-      case 'S': return 'bg-pink-500/25 border-pink-500/45 text-pink-400';
-      case 'C': return 'bg-slate-700/25 border-slate-700/45 text-slate-400';
-      default: return 'bg-slate-800 border-slate-700 text-slate-500';
+      case 'H': return 'bg-blue-500/20 border-blue-500/40 text-blue-400'; // Alpha helix (Blue)
+      case 'G': return 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400';  // 3-10 helix (Cyan)
+      case 'I': return 'bg-indigo-500/20 border-indigo-500/40 text-indigo-400'; // Pi helix (Indigo)
+      
+      case 'E': return 'bg-orange-500/20 border-orange-500/40 text-orange-400'; // Beta strand (Orange)
+      case 'B': return 'bg-amber-600/20 border-amber-600/40 text-amber-500';  // Beta bridge (Amber)
+      
+      case 'T': return 'bg-slate-500/20 border-slate-500/40 text-slate-400'; // Turn (Light Grey)
+      case 'S': return 'bg-zinc-650/20 border-zinc-650/40 text-zinc-400';   // Bend (Darker Grey)
+      case 'C':
+      default: return 'bg-slate-700/20 border-slate-700/40 text-slate-400'; // Coil (Slate)
     }
   };
 
@@ -427,23 +426,38 @@ export const Predict: React.FC = () => {
                 <div className="min-h-[260px] flex flex-col justify-center">
                   {activeTab === 'overview' && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="bg-amber-500/5 border border-amber-500/10 p-5 rounded-2xl text-center">
-                        <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest block">Helix (H)</span>
-                        <p className="text-4xl font-extrabold text-amber-400 mt-2">{q3Breakdown.H}%</p>
-                        <span className="text-[10px] text-slate-500 mt-1 block">Alpha/310/Pi helix structures</span>
-                      </div>
-
-                      <div className="bg-blue-500/5 border border-blue-500/10 p-5 rounded-2xl text-center">
-                        <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest block">Beta Sheet (E)</span>
-                        <p className="text-4xl font-extrabold text-blue-400 mt-2">{q3Breakdown.E}%</p>
-                        <span className="text-[10px] text-slate-500 mt-1 block">Beta strand/bridges</span>
-                      </div>
-
-                      <div className="bg-slate-700/5 border border-slate-700/10 p-5 rounded-2xl text-center">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Coil (C)</span>
-                        <p className="text-4xl font-extrabold text-slate-300 mt-2">{q3Breakdown.C}%</p>
-                        <span className="text-[10px] text-slate-500 mt-1 block">Turns, bends, random coils</span>
-                      </div>
+                      {Object.entries(STRUCTURE_COLORS).map(([key, config]) => {
+                        const countsKey = key as 'H' | 'E' | 'C';
+                        let cardColorClass = '';
+                        let textClass = '';
+                        let desc = '';
+                        
+                        if (key === 'H') {
+                          cardColorClass = 'bg-blue-500/5 border-blue-500/10';
+                          textClass = 'text-blue-400';
+                          desc = 'Alpha/310/Pi helix structures';
+                        } else if (key === 'E') {
+                          cardColorClass = 'bg-orange-500/5 border-orange-500/10';
+                          textClass = 'text-orange-400';
+                          desc = 'Beta strand/bridges';
+                        } else {
+                          cardColorClass = 'bg-slate-700/5 border-slate-700/10';
+                          textClass = 'text-slate-400';
+                          desc = 'Turns, bends, random coils';
+                        }
+                        
+                        return (
+                          <div key={key} className={`${cardColorClass} border p-5 rounded-2xl text-center`}>
+                            <span className={`text-[10px] font-bold ${textClass} uppercase tracking-widest block`}>
+                              {config.label}
+                            </span>
+                            <p className={`text-4xl font-extrabold ${textClass} mt-2`}>
+                              {q3Breakdown[countsKey]}%
+                            </p>
+                            <span className="text-[10px] text-slate-500 mt-1 block">{desc}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
 
