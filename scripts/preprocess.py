@@ -29,6 +29,21 @@ CULLPDB_SEQ_LEN = 700
 CULLPDB_NUM_FEATURES = 57
 
 
+def load_numpy_file(p: Path) -> np.ndarray:
+    """Load a numpy file, supporting gzip compression if necessary."""
+    with open(p, "rb") as f_raw:
+        header = f_raw.read(2)
+        is_gzip = (header == b"\x1f\x8b")
+    
+    if is_gzip:
+        import gzip
+        import io
+        with gzip.open(str(p), "rb") as f:
+            return np.load(io.BytesIO(f.read()))
+    else:
+        return np.load(str(p))
+
+
 def validate_numpy_dataset(data: np.ndarray, name: str) -> bool:
     """Validate the shape and content of a loaded numpy dataset.
 
@@ -45,20 +60,22 @@ def validate_numpy_dataset(data: np.ndarray, name: str) -> bool:
     logger.info(f"  Min/Max: {data.min():.4f} / {data.max():.4f}")
 
     if data.ndim == 2:
-        expected_cols = CULLPDB_SEQ_LEN * CULLPDB_NUM_FEATURES
-        if data.shape[1] != expected_cols:
+        num_cols = data.shape[1]
+        D = num_cols // CULLPDB_SEQ_LEN
+        if D not in (56, 57):
             logger.warning(
-                f"  Unexpected column count: {data.shape[1]} "
-                f"(expected {expected_cols})"
+                f"  Unexpected feature dimension: {D} "
+                f"(expected 56 or 57)"
             )
             return False
         num_proteins = data.shape[0]
     elif data.ndim == 3:
         num_proteins = data.shape[0]
-        if data.shape[1] != CULLPDB_SEQ_LEN or data.shape[2] != CULLPDB_NUM_FEATURES:
+        D = data.shape[2]
+        if data.shape[1] != CULLPDB_SEQ_LEN or D not in (56, 57):
             logger.warning(
                 f"  Unexpected shape: {data.shape} "
-                f"(expected (N, {CULLPDB_SEQ_LEN}, {CULLPDB_NUM_FEATURES}))"
+                f"(expected (N, {CULLPDB_SEQ_LEN}, 56 or 57))"
             )
             return False
     else:
@@ -104,24 +121,33 @@ def compute_dataset_statistics(data: np.ndarray, name: str) -> dict[str, float]:
     """Compute and log statistics for a dataset.
 
     Args:
-        data: Numpy array of shape (N, 700, 57).
+        data: Numpy array of shape (N, 700, 57) or (N, 700, 56).
         name: Dataset name for logging.
 
     Returns:
         Dictionary of computed statistics.
     """
     if data.ndim == 2:
-        data = data.reshape(-1, CULLPDB_SEQ_LEN, CULLPDB_NUM_FEATURES)
+        num_cols = data.shape[1]
+        D = num_cols // CULLPDB_SEQ_LEN
+        data = data.reshape(-1, CULLPDB_SEQ_LEN, D)
 
     num_proteins = data.shape[0]
+    D = data.shape[2]
 
     # Compute sequence lengths
-    aa_profiles = data[:, :, :22]  # (N, 700, 22)
+    aa_profiles = data[:, :, :21]  # (N, 700, 21)
     seq_masks = aa_profiles.sum(axis=2) > 0  # (N, 700)
     seq_lengths = seq_masks.sum(axis=1)  # (N,)
 
     # Compute SS class distribution
-    ss_profiles = data[:, :, 44:52]  # (N, 700, 8)
+    if D == 57:
+        ss_profiles = data[:, :, 44:52]  # (N, 700, 8)
+    elif D == 56:
+        ss_profiles = data[:, :, 43:51]  # (N, 700, 8)
+    else:
+        raise ValueError(f"Unexpected feature dimension: {D}")
+
     ss_classes = np.argmax(ss_profiles, axis=2)  # (N, 700)
 
     ss_labels = ["H", "E", "G", "I", "B", "T", "S", "C"]
@@ -191,15 +217,21 @@ def main() -> None:
     logger.info("=" * 60)
 
     # Process CullPDB
-    cullpdb_path = raw_dir / "cullpdb+profile_6133_filtered.npy"
+    cullpdb_path = raw_dir / "cullpdb+profile_6133_filtered.npy.gz"
+    if not cullpdb_path.exists():
+        cullpdb_path = raw_dir / "cullpdb+profile_6133_filtered.npy"
+
     if cullpdb_path.exists():
         logger.info(f"\nLoading CullPDB from {cullpdb_path}")
-        cullpdb_data = np.load(str(cullpdb_path))
+        cullpdb_data = load_numpy_file(cullpdb_path)
 
         if cullpdb_data.ndim == 1:
-            num_samples = cullpdb_data.shape[0] // (CULLPDB_SEQ_LEN * CULLPDB_NUM_FEATURES)
+            D = cullpdb_data.shape[0] // (CULLPDB_SEQ_LEN * 5534) # Determine features if 1D flat
+            if D not in (56, 57):
+                D = CULLPDB_NUM_FEATURES
+            num_samples = cullpdb_data.shape[0] // (CULLPDB_SEQ_LEN * D)
             cullpdb_data = cullpdb_data.reshape(
-                num_samples, CULLPDB_SEQ_LEN, CULLPDB_NUM_FEATURES
+                num_samples, CULLPDB_SEQ_LEN, D
             )
 
         if validate_numpy_dataset(cullpdb_data, "CullPDB"):
@@ -221,15 +253,21 @@ def main() -> None:
         logger.info("Run: python scripts/download_data.py")
 
     # Process CB513
-    cb513_path = raw_dir / "cb513+profile_split1.npy"
+    cb513_path = raw_dir / "cb513+profile_split1.npy.gz"
+    if not cb513_path.exists():
+        cb513_path = raw_dir / "cb513+profile_split1.npy"
+
     if cb513_path.exists():
         logger.info(f"\nLoading CB513 from {cb513_path}")
-        cb513_data = np.load(str(cb513_path))
+        cb513_data = load_numpy_file(cb513_path)
 
         if cb513_data.ndim == 1:
-            num_samples = cb513_data.shape[0] // (CULLPDB_SEQ_LEN * CULLPDB_NUM_FEATURES)
+            D = cb513_data.shape[0] // (CULLPDB_SEQ_LEN * 514)
+            if D not in (56, 57):
+                D = CULLPDB_NUM_FEATURES
+            num_samples = cb513_data.shape[0] // (CULLPDB_SEQ_LEN * D)
             cb513_data = cb513_data.reshape(
-                num_samples, CULLPDB_SEQ_LEN, CULLPDB_NUM_FEATURES
+                num_samples, CULLPDB_SEQ_LEN, D
             )
 
         if validate_numpy_dataset(cb513_data, "CB513"):
