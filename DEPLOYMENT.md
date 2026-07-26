@@ -1,67 +1,52 @@
-# ProtIntel Production Deployment Guide
+# ProtIntel Persistent Production VPS Deployment Guide
 
-This guide details the exact steps required to deploy the ProtIntel application stack (FastAPI backend + Redis cache + Nginx frontend) onto a fresh Linux Virtual Private Server (VPS) or cloud VM (Ubuntu 22.04 LTS recommended) from scratch.
-
----
-
-## Prerequisites
-
-Before starting, ensure your VPS has:
-- A minimum of **4 GB RAM** (required for ESM-2 650M CPU-only tokenization and forward passes).
-- Port **3000** (frontend) and **8000** (API, optional) open in your firewall (UFW, Security Group).
+This guide details the exact steps to deploy and persistently run ProtIntel (FastAPI Backend + Redis Job/Cache Layer + React/Nginx Frontend) on a cloud VPS (Ubuntu 22.04/24.04 LTS, 4 GB RAM, 2 vCPUs minimum).
 
 ---
 
-## Step 1: Install Docker and Docker Compose
+## 1. System Requirements & Security Configuration
 
-Log in to your VPS via SSH and install Docker:
+### Prerequisites
+- **OS**: Ubuntu 22.04 LTS / 24.04 LTS (x86_64)
+- **CPU**: $\ge 2$ vCPUs
+- **RAM**: $\ge 4\text{ GB}$
+- **Storage**: $\ge 40\text{ GB}$ NVMe/SSD
+
+### UFW Firewall Configuration
+Expose only HTTP/HTTPS and SSH to the public internet:
+```bash
+sudo ufw allow 22/tcp    # SSH
+sudo ufw allow 80/tcp    # HTTP Frontend
+sudo ufw allow 443/tcp   # HTTPS (if domain configured)
+sudo ufw allow 3000/tcp  # Direct Frontend Port
+sudo ufw enable
+```
+
+---
+
+## 2. Docker & Environment Setup
 
 ```bash
-# 1. Update package list
-sudo apt-get update
-
-# 2. Install Docker dependencies
-sudo apt-get install -y ca-certificates curl gnupg
-
-# 3. Add Docker's official GPG key
+# 1. Install Docker & Docker Compose Plugin
+sudo apt-get update && sudo apt-get install -y ca-certificates curl gnupg
 sudo install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 sudo chmod a+r /etc/apt/keyrings/docker.gpg
 
-# 4. Set up the repository
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-# 5. Install Docker Engine and Docker Compose
 sudo apt-get update
 sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-# 6. Verify installation
-sudo docker --version
-sudo docker compose version
-```
-
----
-
-## Step 2: Clone the Repository & Configure Environment
-
-Clone the codebase onto the server:
-
-```bash
-# 1. Clone repo
+# 2. Clone Repository
 git clone https://github.com/RamaVenkataCharan/ProtIntel.git
 cd ProtIntel
 
-# 2. Create environment file from template
+# 3. Configure .env File
 cp .env.example .env
-
-# 3. Edit config using nano or vim
-nano .env
 ```
 
-Ensure the following variables are set in your `.env`:
+Ensure `.env` contains real server settings (replace `<SERVER_PUBLIC_IP>`):
 ```env
 API_HOST=0.0.0.0
 API_PORT=8000
@@ -69,111 +54,68 @@ DEVICE=cpu
 MODEL_PATH=models/best_checkpoint_pruned.pt
 REDIS_HOST=redis
 REDIS_PORT=6379
-CORS_ORIGINS=http://<YOUR_SERVER_IP>:3000
+CORS_ORIGINS=http://<SERVER_PUBLIC_IP>:3000,http://<SERVER_PUBLIC_IP>
 ```
 
 ---
 
-## Step 3: Place the Pruned Model Checkpoint
-
-The pruned checkpoint is required for inference and must be placed in the `models/` directory (which is mounted as a volume by Docker Compose).
+## 3. Checkpoint & Persistent Deployment
 
 ```bash
-# Create models directory
+# 1. Ensure Model Checkpoint Exists
 mkdir -p models
+# Copy pruned model checkpoint (79.7 MB) into models/ directory
 
-# Copy/download your pruned checkpoint (79.7 MB) into the folder:
-# wget -O models/best_checkpoint_pruned.pt <URL_TO_CHECKPOINT_STORE>
-# Or copy from local development machine:
-# scp models/best_checkpoint_pruned.pt user@server:/path/to/ProtIntel/models/
-```
-
-*Note: Ensure the filename matches the `MODEL_PATH` setting inside `.env`.*
-
----
-
-## Step 4: Run the Docker Compose Stack
-
-Build and start the microservices in detached mode:
-
-```bash
-# Start containers
+# 2. Launch Stack in Detached Mode
 sudo docker compose up -d --build
 ```
 
-This will spin up:
-1. `protintel-redis`: Redis v7 caching instance.
-2. `protintel-backend`: FastAPI application server (port 8000).
-3. `protintel-frontend`: Nginx server hosting the React app (port 3000) and proxying `/api/*` to the backend.
-
-Verify the status of the running containers:
+### Persistence Verification (`restart: unless-stopped`)
+All containers in `docker-compose.yml` are configured with `restart: unless-stopped`. To verify persistence across system reboots:
 ```bash
-sudo docker compose ps
+sudo reboot
 ```
+Upon reboot, systemd automatically restarts Docker Engine and all container instances (`protintel-redis`, `protintel-backend`, `protintel-frontend`) start automatically without manual intervention.
 
 ---
 
-## Step 5: Verification & Smoke Test
+## 4. SSL & Domain Configuration (Optional)
 
-### 1. Check Container Health
-Wait ~10 seconds for the model weights to load, then run a curl check against the health endpoint:
-
+If a domain name (e.g. `protintel.example.com`) is pointed to your VPS public IP:
 ```bash
-curl -i http://localhost:8000/health
+sudo apt-get install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d protintel.example.com
 ```
 
-Expected response (`HTTP/1.1 200 OK`):
-```json
-{
-  "status": "healthy",
-  "model_loaded": true,
-  "device": "cpu",
-  "redis_connected": true
-}
-```
-
-*Note: If the model is not loaded or Redis is down, this endpoint will return `503 Service Unavailable`.*
-
-### 2. Inspect Prometheus Metrics
-Verify Prometheus metrics are active and showing request counters and queue depth:
-
-```bash
-curl http://localhost:8000/prometheus
-```
-
-### 3. Verify Frontend Access
-Open your web browser and navigate to `http://<YOUR_SERVER_IP>:3000`. 
-Submit a single sequence (e.g. `MKFLILLFN`) on the Predict tab and verify that:
-- A spinner overlay appears.
-- Predictions and explainability maps load successfully.
+*Note: If deploying via raw IP address without a domain, HTTPS is not supported by ACME/Let's Encrypt, and the application runs persistently over HTTP on port 3000 / port 80.*
 
 ---
 
-## Step 6: GPU Acceleration Setup (Optional but Recommended)
+## 5. Deployment Verification Checklist
 
-Because CPU ESM-2 inference takes ~4.75s, deploying on an Nvidia GPU-enabled server will reduce latency to <200ms.
+Run these commands on the live server IP:
 
-1. **Install NVIDIA Container Toolkit**:
-   Follow instructions at [docs.nvidia.com](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) to enable GPU support inside Docker.
-
-2. **Update `.env`**:
-   Set `DEVICE=cuda` inside `.env`.
-
-3. **Update `docker-compose.yml`**:
-   Uncomment/add GPU reservations to the backend service:
-   ```yaml
-     backend:
-       ...
-       deploy:
-         resources:
-           reservations:
-             devices:
-               - driver: nvidia
-                 count: all
-                 capabilities: [gpu]
-   ```
-
-4. **Restart Containers**:
+1. **Backend Health Check**:
    ```bash
-   sudo docker compose down && sudo docker compose up -d
+   curl -i http://<SERVER_PUBLIC_IP>:8000/health
    ```
+   *Expected Response (`200 OK`)*:
+   ```json
+   {
+     "status": "healthy",
+     "model_loaded": true,
+     "device": "cpu",
+     "redis_connected": true
+   }
+   ```
+
+2. **Rate Limiting Check**:
+   ```bash
+   for i in {1..12}; do curl -s -o /dev/null -w "%{http_code}\n" -X POST http://<SERVER_PUBLIC_IP>:8000/predict -H "Content-Type: application/json" -d '{"sequence":"MKFLILLFN"}'; done
+   ```
+   *Expected Outcome*: First 10 requests return `200`, 11th and 12th return `429 Too Many Requests`.
+
+3. **End-to-End Prediction Test**:
+   - Navigate to `http://<SERVER_PUBLIC_IP>:3000` in browser.
+   - Enter sequence `MVLSEGEWQLVLHVWAKVEADVAGHGQDILIRLFKSHPETLEKFDRVKHLKTEAEMKASEDLKKHGVTVLTALGAILKKKGHHEAELKPLAQSHATKHKIPIKYLEFISEAIIHVLHSRHPGDFGADAQGAMNKALELFRKDIAAKYKELGYQG`.
+   - Verify async job polling transitions: `Job Queued...` $\rightarrow$ `Calculating XAI...` $\rightarrow$ `3D Aurora Ribbon & Secondary Structure Map`.

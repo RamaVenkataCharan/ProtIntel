@@ -5,7 +5,7 @@ import { AttentionHeatmap } from '../components/AttentionHeatmap';
 
 const ProteinStructure3D = lazy(() => import('../components/ProteinStructure3D').then(m => ({ default: m.ProteinStructure3D })));
 
-import { STRUCTURE_COLORS } from '../utils/colors';
+import { STRUCTURE_COLORS, Q8_STRUCTURE_COLORS } from '../utils/colors';
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip as ChartTooltip, CartesianGrid } from 'recharts';
 import { Activity, Play, AlertCircle, Info, HelpCircle } from 'lucide-react';
 
@@ -97,19 +97,8 @@ export const Predict: React.FC = () => {
   };
 
   const getQ8ColorClass = (char: string) => {
-    switch (char) {
-      case 'H': return 'bg-blue-500/20 border-blue-500/40 text-blue-400'; // Alpha helix (Blue)
-      case 'G': return 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400';  // 3-10 helix (Cyan)
-      case 'I': return 'bg-indigo-950/40 border-indigo-900/10 text-indigo-500/50 opacity-60'; // Pi helix (Muted)
-      
-      case 'E': return 'bg-orange-500/20 border-orange-500/40 text-orange-400'; // Beta strand (Orange)
-      case 'B': return 'bg-amber-950/40 border-amber-900/10 text-amber-500/50 opacity-60';  // Beta bridge (Muted)
-      
-      case 'T': return 'bg-slate-500/20 border-slate-500/40 text-slate-400'; // Turn (Light Grey)
-      case 'S': return 'bg-zinc-900/40 border-zinc-800/10 text-zinc-550 opacity-60';   // Bend (Muted)
-      case 'C':
-      default: return 'bg-slate-700/20 border-slate-700/40 text-slate-400'; // Coil (Slate)
-    }
+    const q8 = (char in Q8_STRUCTURE_COLORS) ? (char as keyof typeof Q8_STRUCTURE_COLORS) : 'C';
+    return Q8_STRUCTURE_COLORS[q8].bgClass;
   };
 
   // Prepare chart data
@@ -299,6 +288,7 @@ export const Predict: React.FC = () => {
                 <ProteinStructure3D
                   sequence={activePrediction?.sequence ?? null}
                   q3Prediction={activePrediction?.q3_prediction ?? null}
+                  q8Prediction={activePrediction?.q8_prediction ?? null}
                   confidence={activePrediction?.confidence ?? null}
                   hoveredIndex={hoveredResidue?.index ?? null}
                   isPredicting={isPredicting}

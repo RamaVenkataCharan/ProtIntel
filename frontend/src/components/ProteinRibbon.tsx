@@ -2,11 +2,12 @@ import React, { useRef, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { generateProteinPath } from '../utils/pathGenerator';
-import { STRUCTURE_COLORS, NEUTRAL_COLORS } from '../utils/colors';
+import { STRUCTURE_COLORS, Q8_STRUCTURE_COLORS, NEUTRAL_COLORS } from '../utils/colors';
 
 interface ProteinRibbonProps {
   sequence: string;
   q3Prediction: string[];
+  q8Prediction?: string[] | null;
   confidence: number[];
   hoveredIndex: number | null;
   resetTrigger: number;
@@ -17,6 +18,7 @@ interface ProteinRibbonProps {
 export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
   sequence,
   q3Prediction,
+  q8Prediction,
   confidence,
   hoveredIndex,
   resetTrigger,
@@ -178,7 +180,11 @@ export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
 
       // 4. Color & Material calculation (Color interpolates during the fold reveal)
       const q3Key = (q3 === 'H' || q3 === 'E' || q3 === 'C') ? q3 : 'C';
-      const finalColor = new THREE.Color(STRUCTURE_COLORS[q3Key].hex);
+      const q8Char = q8Prediction ? q8Prediction[i] : null;
+      const q8Key = (q8Char && q8Char in Q8_STRUCTURE_COLORS) ? (q8Char as keyof typeof Q8_STRUCTURE_COLORS) : null;
+      
+      const targetHex = q8Key ? Q8_STRUCTURE_COLORS[q8Key].hex : STRUCTURE_COLORS[q3Key].hex;
+      const finalColor = new THREE.Color(targetHex);
 
       // Lerp from the neutral loading color to the final predicted structure color
       tempColor.lerpColors(colorNeutral, finalColor, localReveal);
@@ -223,8 +229,10 @@ export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
     >
       <boxGeometry args={[1, 1, 1]} />
       <meshStandardMaterial
-        roughness={0.25}
-        metalness={0.6}
+        roughness={0.2}
+        metalness={0.5}
+        emissive="#1a0b2e"
+        emissiveIntensity={0.15}
         flatShading={false}
       />
     </instancedMesh>

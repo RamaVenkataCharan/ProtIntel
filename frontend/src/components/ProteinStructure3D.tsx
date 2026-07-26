@@ -9,6 +9,7 @@ import { STRUCTURE_COLORS, NEUTRAL_COLORS } from '../utils/colors';
 interface ProteinStructure3DProps {
   sequence: string | null;
   q3Prediction: string[] | null;
+  q8Prediction?: string[] | null;
   confidence: number[] | null;
   hoveredIndex: number | null;
   isPredicting: boolean;
@@ -124,6 +125,7 @@ const LoadingRibbon: React.FC = () => {
 export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
   sequence,
   q3Prediction,
+  q8Prediction,
   confidence,
   hoveredIndex,
   isPredicting,
@@ -159,7 +161,7 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
   const hasData = sequence && q3Prediction && confidence;
 
   return (
-    <div className="w-full h-[400px] bg-slate-950/70 border border-slate-900 rounded-3xl relative overflow-hidden flex flex-col group/canvas">
+    <div className="w-full h-[400px] bg-[radial-gradient(circle_at_30%_20%,#1a0b2e_0%,#0a0e17_60%,#050508_100%)] border border-purple-900/30 rounded-3xl relative overflow-hidden flex flex-col group/canvas">
       {/* Controls Overlay */}
       <div className="absolute top-4 left-4 z-10 flex gap-2">
         <button
@@ -199,19 +201,20 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
           gl={{ antialias: !isMobile, powerPreference: "high-performance" }}
           camera={{ fov: 40, near: 0.1, far: 100, position: [0, 0, 25] }}
         >
-          <color attach="background" args={['#070a13']} />
+          <color attach="background" args={['#0a0e17']} />
+          <fog attach="fog" args={['#0a0e17', 15, 40]} />
 
           {/* Lighting Rig */}
-          <ambientLight intensity={0.5} />
+          <ambientLight intensity={0.6} />
           <directionalLight
             position={[10, 20, 10]}
-            intensity={1.0}
+            intensity={1.2}
             castShadow
             shadow-mapSize-width={1024}
             shadow-mapSize-height={1024}
           />
-          <pointLight position={[-10, -10, -10]} intensity={0.3} color="#2A9D8F" />
-          <pointLight position={[0, 0, 15]} intensity={0.4} color="#A855F7" />
+          <pointLight position={[-10, -10, -10]} intensity={0.4} color="#00D9C0" />
+          <pointLight position={[0, 0, 15]} intensity={0.5} color="#7B2FF7" />
 
           {/* Camera Dolly Trigger */}
           <CameraRig reducedMotion={reducedMotion} />
@@ -238,6 +241,7 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
               <ProteinRibbon
                 sequence={sequence}
                 q3Prediction={q3Prediction}
+                q8Prediction={q8Prediction}
                 confidence={confidence}
                 hoveredIndex={hoveredIndex}
                 resetTrigger={resetTrigger}
