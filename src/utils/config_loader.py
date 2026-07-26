@@ -137,6 +137,8 @@ class LossConfig(BaseModel):
     """Loss function configuration."""
 
     type: str = "cross_entropy"
+    q3_type: str = "cross_entropy"
+    q8_type: str = "cross_entropy"
     label_smoothing: float = 0.1
     use_class_weights: bool = True
     focal_gamma: float = 2.0

@@ -56,14 +56,16 @@ class ModelTrainer:
         self.device = torch.device(device)
 
         # Loss functions
+        q3_loss_type = getattr(self.config.loss, "q3_type", self.config.loss.type)
+        q8_loss_type = getattr(self.config.loss, "q8_type", self.config.loss.type)
         self.q3_loss_fn = create_loss_function(
-            loss_type=self.config.loss.type,
+            loss_type=q3_loss_type,
             label_smoothing=self.config.loss.label_smoothing,
             class_weights=q3_class_weights,
             focal_gamma=self.config.loss.focal_gamma,
         )
         self.q8_loss_fn = create_loss_function(
-            loss_type=self.config.loss.type,
+            loss_type=q8_loss_type,
             label_smoothing=self.config.loss.label_smoothing,
             class_weights=q8_class_weights,
             focal_gamma=self.config.loss.focal_gamma,
