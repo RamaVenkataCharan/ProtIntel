@@ -68,7 +68,7 @@ export interface JobStatusResponse {
   error?: string;
 }
 
-// Proxied via Vite config to http://localhost:8000
+// Proxied via Vite config to http://localhost:8000 (works for tunnel visitors too)
 const API_BASE = '/api';
 
 export async function fetchHealth(): Promise<HealthResponse> {

@@ -74,3 +74,8 @@ coverage.xml
 
 # mypy
 .mypy_cache/
+
+# Scratch & Archives
+scratch/
+*.zip
+
