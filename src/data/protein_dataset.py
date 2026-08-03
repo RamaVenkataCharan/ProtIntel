@@ -353,16 +353,46 @@ class ProteinDataset(Dataset):
             if len(sequence) < min_len:
                 continue
 
-            # Truncate to max length
-            if len(sequence) > self.max_seq_length:
-                sequence = sequence[: self.max_seq_length]
-                q3_label_str = q3_label_str[: self.max_seq_length]
-                q8_label_str = q8_label_str[: self.max_seq_length]
+            sw_enabled = self.config.get("sliding_window_enabled", False)
+            if sw_enabled and self.split == "train":
+                sw_size = self.config.get("sliding_window_size", 512)
+                sw_stride = self.config.get("sliding_window_stride", 64)
 
-            self.sequences.append(sequence)
-            self.q3_labels.append(q3_label_str)
-            self.q8_labels.append(q8_label_str)
-            self.protein_ids.append(f"{self.split}_{idx}")
+                if len(sequence) <= sw_size:
+                    self.sequences.append(sequence)
+                    self.q3_labels.append(q3_label_str)
+                    self.q8_labels.append(q8_label_str)
+                    self.protein_ids.append(f"{self.split}_{idx}")
+                else:
+                    w_idx = 0
+                    seq_len = len(sequence)
+                    for start in range(0, seq_len - sw_size + 1, sw_stride):
+                        end = start + sw_size
+                        self.sequences.append(sequence[start:end])
+                        self.q3_labels.append(q3_label_str[start:end])
+                        self.q8_labels.append(q8_label_str[start:end])
+                        self.protein_ids.append(f"{self.split}_{idx}_w{w_idx}")
+                        w_idx += 1
+                    # Append remaining tail window if not exact stride boundary
+                    if (seq_len - sw_size) % sw_stride != 0:
+                        start = seq_len - sw_size
+                        end = seq_len
+                        self.sequences.append(sequence[start:end])
+                        self.q3_labels.append(q3_label_str[start:end])
+                        self.q8_labels.append(q8_label_str[start:end])
+                        self.protein_ids.append(f"{self.split}_{idx}_w{w_idx}")
+            else:
+                # Truncate to max length
+                if len(sequence) > self.max_seq_length:
+                    sequence = sequence[: self.max_seq_length]
+                    q3_label_str = q3_label_str[: self.max_seq_length]
+                    q8_label_str = q8_label_str[: self.max_seq_length]
+
+                self.sequences.append(sequence)
+                self.q3_labels.append(q3_label_str)
+                self.q8_labels.append(q8_label_str)
+                self.protein_ids.append(f"{self.split}_{idx}")
+
 
     def _load_fasta_dataset(self, path: Path) -> None:
         """Load a paired FASTA + labels dataset.

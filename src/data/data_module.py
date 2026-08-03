@@ -187,6 +187,15 @@ class ProteinDataModule:
             "embeddings_dir": str(self.embeddings_dir),
             "augmentation": augmentation,
             "max_samples": self.config.get("max_samples", None),
+            "sliding_window_enabled": self.config.get(
+                "sliding_window_enabled", augmentation.get("sliding_window_enabled", False)
+            ),
+            "sliding_window_size": self.config.get(
+                "sliding_window_size", augmentation.get("sliding_window_size", 512)
+            ),
+            "sliding_window_stride": self.config.get(
+                "sliding_window_stride", augmentation.get("sliding_window_stride", 64)
+            ),
         }
 
     def _resolve_split_path(self, split: str) -> Path:
@@ -457,6 +466,9 @@ class ProteinDataModule:
                 "sliding_window_overlap": config.preprocessing.sliding_window_overlap,
             },
             "splits": {"train": "cullpdb", "val": "cb513", "test": "cb513"},
+            "sliding_window_enabled": getattr(config, "sliding_window_enabled", False),
+            "sliding_window_size": getattr(config, "sliding_window_size", 512),
+            "sliding_window_stride": getattr(config, "sliding_window_stride", 64),
         }
 
         # Resolve batch size: explicit arg > Pydantic config default.

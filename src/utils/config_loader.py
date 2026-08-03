@@ -207,6 +207,7 @@ class TrainingConfig(BaseModel):
     scheduler_params: SchedulerParamsConfig = Field(default_factory=SchedulerParamsConfig)
     warmup_epochs: int = 3
     warmup_start_lr: float = 1e-6
+    esm2_lr: float = 1e-5
     early_stopping: EarlyStoppingConfig = Field(default_factory=EarlyStoppingConfig)
     loss: LossConfig = Field(default_factory=LossConfig)
     task_weights: TaskWeightsConfig = Field(default_factory=TaskWeightsConfig)
@@ -272,9 +273,13 @@ class DataConfig(BaseModel):
     processed_dir: str = "datasets/processed"
     embeddings_cache_dir: str = "datasets/processed/embeddings"
     max_samples: int | None = None
+    sliding_window_enabled: bool = False
+    sliding_window_size: int = 512
+    sliding_window_stride: int = 64
     preprocessing: PreprocessingConfig = Field(default_factory=PreprocessingConfig)
     dataloader: DataLoaderConfig = Field(default_factory=DataLoaderConfig)
     labels: LabelConfig = Field(default_factory=LabelConfig)
+
 
 
 class InferenceXAIConfig(BaseModel):

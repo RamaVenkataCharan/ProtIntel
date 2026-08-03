@@ -113,16 +113,32 @@ class ModelTrainer:
         Returns:
             Configured optimizer instance.
         """
-        # Get downstream parameters (exclude frozen ESM-2)
-        if hasattr(self.model, "get_downstream_parameters"):
-            params = self.model.get_downstream_parameters()
+        esm2_params = []
+        downstream_params = []
+        for name, param in self.model.named_parameters():
+            if param.requires_grad:
+                if "embedding_generator" in name or "esm2" in name:
+                    esm2_params.append(param)
+                else:
+                    downstream_params.append(param)
+
+        esm2_lr = getattr(self.config, "esm2_lr", 1.0e-5)
+        if esm2_params:
+            logger.info(
+                f"Configuring optimizer with separate LR: "
+                f"downstream={self.config.learning_rate}, esm2={esm2_lr}"
+            )
+            param_groups = [
+                {"params": downstream_params, "lr": self.config.learning_rate},
+                {"params": esm2_params, "lr": esm2_lr},
+            ]
         else:
-            params = [p for p in self.model.parameters() if p.requires_grad]
+            param_groups = downstream_params
 
         opt_name = self.config.optimizer.lower()
         if opt_name == "adamw":
             return torch.optim.AdamW(
-                params,
+                param_groups,
                 lr=self.config.learning_rate,
                 weight_decay=self.config.weight_decay,
                 betas=tuple(self.config.optimizer_params.betas),
@@ -130,19 +146,20 @@ class ModelTrainer:
             )
         elif opt_name == "adam":
             return torch.optim.Adam(
-                params,
+                param_groups,
                 lr=self.config.learning_rate,
                 weight_decay=self.config.weight_decay,
             )
         elif opt_name == "sgd":
             return torch.optim.SGD(
-                params,
+                param_groups,
                 lr=self.config.learning_rate,
                 weight_decay=self.config.weight_decay,
                 momentum=0.9,
             )
         else:
             raise ValueError(f"Unknown optimizer: {opt_name}")
+
 
     def _create_scheduler(self) -> Optional[torch.optim.lr_scheduler.LRScheduler]:
         """Create the learning rate scheduler.
@@ -151,7 +168,34 @@ class ModelTrainer:
             Configured scheduler, or None if not specified.
         """
         sched_name = self.config.scheduler.lower()
-        if sched_name == "reduce_on_plateau":
+        warmup_epochs = getattr(self.config, "warmup_epochs", 0)
+        total_epochs = getattr(self.config, "epochs", 100)
+
+        if sched_name in ("cosine_warmup", "cosine") and warmup_epochs > 0:
+            from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR
+            start_lr = getattr(self.config, "warmup_start_lr", 2.0e-5)
+            base_lr = getattr(self.config, "learning_rate", 2.0e-4)
+            # Ensure start_factor is at least 0.1 to avoid stalling gradient updates in epoch 1
+            raw_factor = start_lr / max(base_lr, 1e-9)
+            start_factor = max(0.1, raw_factor)
+
+            warmup_sched = LinearLR(
+                self.optimizer,
+                start_factor=start_factor,
+                end_factor=1.0,
+                total_iters=warmup_epochs,
+            )
+            cosine_sched = CosineAnnealingLR(
+                self.optimizer,
+                T_max=max(1, total_epochs - warmup_epochs),
+                eta_min=getattr(self.config.scheduler_params, "min_lr", 1.0e-6),
+            )
+            return SequentialLR(
+                self.optimizer,
+                schedulers=[warmup_sched, cosine_sched],
+                milestones=[warmup_epochs],
+            )
+        elif sched_name == "reduce_on_plateau":
             return torch.optim.lr_scheduler.ReduceLROnPlateau(
                 self.optimizer,
                 mode=self.config.early_stopping.mode,
@@ -168,6 +212,7 @@ class ModelTrainer:
         elif sched_name == "onecycle":
             return None  # Created after knowing steps_per_epoch
         return None
+
 
     def _compute_loss(
         self, outputs: dict[str, torch.Tensor], batch: dict[str, Any]
