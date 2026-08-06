@@ -4,33 +4,65 @@ import * as THREE from 'three';
 import { generateProteinPath } from '../utils/pathGenerator';
 import { STRUCTURE_COLORS, Q8_STRUCTURE_COLORS, NEUTRAL_COLORS } from '../utils/colors';
 
+export type ViewMode3D = 'structure' | 'xai' | 'q3' | 'q8';
+
 interface ProteinRibbonProps {
   sequence: string;
   q3Prediction: string[];
   q8Prediction?: string[] | null;
   confidence: number[];
+  residueImportance?: number[] | null;
   hoveredIndex: number | null;
+  selectedIndex: number | null;
+  scrubberIndex: number | null;
+  measurePoints: [number, number] | null;
+  viewMode: ViewMode3D;
+  colorMorph: number; // 0 = Q3, 1 = Q8
   resetTrigger: number;
   reducedMotion: boolean;
   isMobile: boolean;
+  onSelectResidue: (index: number | null) => void;
+  onHoverResidue: (index: number | null) => void;
 }
+
+// XAI Heatmap Colormap Generator (Cool Blue -> Amber -> Crimson Red)
+const getHeatmapColor = (importance: number): THREE.Color => {
+  const norm = Math.max(0, Math.min(1, importance));
+  const coolBlue = new THREE.Color('#3B82F6');
+  const warmAmber = new THREE.Color('#F59E0B');
+  const hotCrimson = new THREE.Color('#EF4444');
+  
+  const col = new THREE.Color();
+  if (norm < 0.5) {
+    col.lerpColors(coolBlue, warmAmber, norm * 2);
+  } else {
+    col.lerpColors(warmAmber, hotCrimson, (norm - 0.5) * 2);
+  }
+  return col;
+};
 
 export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
   sequence,
   q3Prediction,
   q8Prediction,
   confidence,
+  residueImportance,
   hoveredIndex,
+  selectedIndex,
+  scrubberIndex,
+  measurePoints,
+  viewMode,
+  colorMorph,
   resetTrigger,
   reducedMotion,
   isMobile,
+  onSelectResidue,
+  onHoverResidue,
 }) => {
   const instancedMeshRef = useRef<THREE.InstancedMesh>(null);
   
   // Stored path data
   const pathDataRef = useRef(generateProteinPath(sequence, q3Prediction));
-  
-  // Animation refs
   const revealProgressRef = useRef(reducedMotion ? 1 : 0);
   const pulseIndexRef = useRef<number | null>(null);
 
@@ -40,25 +72,23 @@ export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
     revealProgressRef.current = reducedMotion ? 1 : 0;
   }, [sequence, q3Prediction, reducedMotion]);
 
-  // Handle manual reset triggers (e.g. Play Fold-in Again)
   useEffect(() => {
     if (!reducedMotion) {
       revealProgressRef.current = 0;
     }
   }, [resetTrigger, reducedMotion]);
 
-  // Color Palette Definitions
-  const colorNeutral = new THREE.Color(NEUTRAL_COLORS.loadingHex);
-  const colorPulse = new THREE.Color(NEUTRAL_COLORS.highlightHex);
-  const colorLowConf = new THREE.Color(NEUTRAL_COLORS.lowConfHex);
-
-  // Temp objects for instance modifications (pre-allocated for performance)
+  // Pre-allocated temporaries for instance loop
   const tempMatrix = new THREE.Matrix4();
   const tempPosition = new THREE.Vector3();
   const tempDirection = new THREE.Vector3();
   const tempRotation = new THREE.Quaternion();
   const tempScale = new THREE.Vector3();
   const tempColor = new THREE.Color();
+  const colorNeutral = new THREE.Color(NEUTRAL_COLORS.loadingHex);
+  const colorHoverGlow = new THREE.Color('#00D9C0');
+  const colorSelectGlow = new THREE.Color('#FFB347');
+  const colorLowConf = new THREE.Color('#334155');
   const zAxis = new THREE.Vector3(0, 0, 1);
 
   useFrame((state, delta) => {
@@ -69,23 +99,22 @@ export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
     const { foldedPoints, unfoldedPoints } = pathDataRef.current;
     const time = state.clock.getElapsedTime();
 
-    // 1. Progress the fold-in reveal animation
+    // 1. Progress reveal animation
     if (revealProgressRef.current < 1 && !reducedMotion) {
-      // Slower reveal on larger structures
-      const speed = L > 300 ? 0.5 : 0.8;
+      const speed = L > 300 ? 0.5 : 0.85;
       revealProgressRef.current = Math.min(1, revealProgressRef.current + delta * speed);
     }
 
-    // 2. Animate the traveling attention pulse position
-    if (hoveredIndex !== null) {
+    // 2. Pulse position interpolation towards hover/scrubber
+    const targetTarget = hoveredIndex !== null ? hoveredIndex : scrubberIndex;
+    if (targetTarget !== null) {
       if (pulseIndexRef.current === null) {
-        pulseIndexRef.current = 0; // Start pulse from N-terminus
+        pulseIndexRef.current = targetTarget;
       } else {
-        // Sweep towards target hovered index smoothly
-        const pulseSpeed = L > 300 ? 50 : 35; // residues per second
-        const diff = hoveredIndex - pulseIndexRef.current;
+        const pulseSpeed = L > 300 ? 50 : 35;
+        const diff = targetTarget - pulseIndexRef.current;
         if (Math.abs(diff) < 0.1) {
-          pulseIndexRef.current = hoveredIndex;
+          pulseIndexRef.current = targetTarget;
         } else {
           pulseIndexRef.current += Math.sign(diff) * Math.min(Math.abs(diff), delta * pulseSpeed);
         }
@@ -94,36 +123,36 @@ export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
       pulseIndexRef.current = null;
     }
 
-    // 3. Update instances
+    // Find max importance for normalization if XAI mode
+    let maxImportance = 1.0;
+    if (residueImportance && residueImportance.length > 0) {
+      maxImportance = Math.max(...residueImportance.map(v => Math.abs(v))) || 1.0;
+    }
+
     const limit = L - 1;
     for (let i = 0; i < limit; i++) {
       const q3 = q3Prediction[i] || 'C';
       const conf = confidence[i] !== undefined ? confidence[i] : 1.0;
-      
-      // Determine stagger delay for reveal (from N-terminus to C-terminus)
-      const staggerDelay = (i / limit) * 0.45; // Max 45% delay offset
+      const importance = residueImportance?.[i] ?? 0;
+      const normImportance = Math.abs(importance) / maxImportance;
+
+      const staggerDelay = (i / limit) * 0.45;
       let localReveal = 1;
-      
       if (!reducedMotion) {
-        // Calculate dynamic reveal progress for this specific residue
         const localVal = (revealProgressRef.current - staggerDelay) / (1 - 0.45);
         localReveal = Math.max(0, Math.min(1, localVal));
       }
 
-      // Smooth coordinate interpolation (flat line -> folded shape)
       const p1_flat = unfoldedPoints[i];
       const p2_flat = unfoldedPoints[i + 1];
       const p1_folded = foldedPoints[i];
       const p2_folded = foldedPoints[i + 1];
 
-      // Interpolated endpoints
       const curP1 = new THREE.Vector3().lerpVectors(p1_flat, p1_folded, localReveal);
       const curP2 = new THREE.Vector3().lerpVectors(p2_flat, p2_folded, localReveal);
 
-      // Center position
       tempPosition.addVectors(curP1, curP2).multiplyScalar(0.5);
 
-      // Length and direction of interpolated segment
       tempDirection.subVectors(curP2, curP1);
       const curLength = tempDirection.length();
       if (curLength > 0.001) {
@@ -133,91 +162,83 @@ export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
         tempRotation.set(0, 0, 0, 1);
       }
 
-      // Define default dimensions based on Secondary Structure class
+      // Geometry Dimensions
       let baseWidth = 0.4;
       let baseHeight = 0.4;
-
       if (q3 === 'H') {
-        // Helices are thicker cylindrical coils
-        baseWidth = isMobile ? 0.75 : 0.85;
-        baseHeight = isMobile ? 0.75 : 0.85;
+        baseWidth = isMobile ? 0.7 : 0.8;
+        baseHeight = isMobile ? 0.7 : 0.8;
       } else if (q3 === 'E') {
-        // Sheets are flat ribbons
-        baseWidth = isMobile ? 1.4 : 1.6;
-        baseHeight = isMobile ? 0.12 : 0.16;
+        baseWidth = isMobile ? 2.2 : 2.6;
+        baseHeight = isMobile ? 0.08 : 0.10;
       } else {
-        // Coils are thin cylinders
-        baseWidth = 0.3;
-        baseHeight = 0.3;
+        baseWidth = 0.22;
+        baseHeight = 0.22;
       }
 
-      // Hover / Pulse scaling effect
+      // Scale multipliers for hover / select / scrubber / measurement
       let scaleMult = 1.0;
-      let isHighlighted = false;
-      
-      // Calculate closeness to the traveling attention pulse
-      if (pulseIndexRef.current !== null) {
-        const distToPulse = Math.abs(i - pulseIndexRef.current);
-        if (distToPulse < 3.0) {
-          // Gaussian-like pulse peak
-          const pulseIntensity = Math.exp(-Math.pow(distToPulse, 2) / 2);
-          scaleMult += pulseIntensity * 0.4;
-          isHighlighted = true;
-        }
-      }
+      const isHov = hoveredIndex === i;
+      const isSel = selectedIndex === i;
+      const isScrub = scrubberIndex === i;
+      const isMeasured = measurePoints ? (measurePoints[0] === i || measurePoints[1] === i) : false;
 
-      // Direct hover state gets priority scale increase
-      if (hoveredIndex !== null && hoveredIndex === i) {
-        scaleMult = 1.4;
-        isHighlighted = true;
-      }
+      if (isSel) scaleMult = 1.6;
+      else if (isHov) scaleMult = 1.4;
+      else if (isScrub) scaleMult = 1.45;
+      else if (isMeasured) scaleMult = 1.5;
 
       tempScale.set(baseWidth * scaleMult, baseHeight * scaleMult, curLength || 0.01);
-
-      // Apply transform matrix to instance
       tempMatrix.compose(tempPosition, tempRotation, tempScale);
       mesh.setMatrixAt(i, tempMatrix);
 
-      // 4. Color & Material calculation (Color interpolates during the fold reveal)
+      // Color computation based on View Mode
       const q3Key = (q3 === 'H' || q3 === 'E' || q3 === 'C') ? q3 : 'C';
       const q8Char = q8Prediction ? q8Prediction[i] : null;
       const q8Key = (q8Char && q8Char in Q8_STRUCTURE_COLORS) ? (q8Char as keyof typeof Q8_STRUCTURE_COLORS) : null;
-      
-      const targetHex = q8Key ? Q8_STRUCTURE_COLORS[q8Key].hex : STRUCTURE_COLORS[q3Key].hex;
-      const finalColor = new THREE.Color(targetHex);
 
-      // Lerp from the neutral loading color to the final predicted structure color
-      tempColor.lerpColors(colorNeutral, finalColor, localReveal);
+      const colorQ3 = new THREE.Color(STRUCTURE_COLORS[q3Key].hex);
+      const colorQ8 = new THREE.Color(q8Key ? Q8_STRUCTURE_COLORS[q8Key].hex : STRUCTURE_COLORS[q3Key].hex);
 
-      // Confidence desaturation and pulsing logic
-      if (conf < 0.70) {
-        // Linear interpolation towards gray based on low-confidence severity
-        const desatFactor = (0.70 - conf) * 1.3; // max out around 0.5 conf
+      // Interpolate between Q3 and Q8 structure colors via colorMorph slider
+      const colorStruct = new THREE.Color().lerpColors(colorQ3, colorQ8, colorMorph);
+
+      let targetColor: THREE.Color;
+
+      if (viewMode === 'xai') {
+        targetColor = getHeatmapColor(normImportance);
+      } else if (viewMode === 'q3') {
+        targetColor = colorQ3;
+      } else if (viewMode === 'q8') {
+        targetColor = colorQ8;
+      } else {
+        targetColor = colorStruct;
+      }
+
+      tempColor.lerpColors(colorNeutral, targetColor, localReveal);
+
+      // Confidence-Based Opacity / Desaturation Encoding
+      if (conf < 0.65) {
+        const desatFactor = (0.65 - conf) * 1.4;
         tempColor.lerp(colorLowConf, Math.min(0.85, desatFactor));
-
-        // Subtle slow breathe pulse for low-confidence areas to denote uncertainty
         if (!reducedMotion) {
           const pulseIntensity = Math.sin(time * 3 + i * 0.1) * 0.15 + 0.85;
           tempColor.multiplyScalar(pulseIntensity);
         }
       }
 
-      // Blend attention highlight color
-      if (isHighlighted && pulseIndexRef.current !== null) {
-        const distToPulse = Math.abs(i - pulseIndexRef.current);
-        const hoverWeight = hoveredIndex === i ? 1.0 : Math.exp(-Math.pow(distToPulse, 2) / 2);
-        tempColor.lerp(colorPulse, hoverWeight * 0.95);
-      } else if (hoveredIndex === i) {
-        tempColor.lerp(colorPulse, 0.95);
+      // Priority Highlights: Selection (Amber) > Hover / Scrubber (Teal)
+      if (isSel || isMeasured) {
+        tempColor.lerp(colorSelectGlow, 0.95);
+      } else if (isHov || isScrub) {
+        tempColor.lerp(colorHoverGlow, 0.92);
       }
 
       mesh.setColorAt(i, tempColor);
     }
 
     mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) {
-      mesh.instanceColor.needsUpdate = true;
-    }
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   });
 
   return (
@@ -226,13 +247,29 @@ export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
       args={[null as any, null as any, sequence.length - 1]}
       castShadow
       receiveShadow
+      onClick={(e) => {
+        e.stopPropagation();
+        if (e.instanceId !== undefined) {
+          onSelectResidue(e.instanceId);
+        }
+      }}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        if (e.instanceId !== undefined) {
+          onHoverResidue(e.instanceId);
+        }
+      }}
+      onPointerOut={(e) => {
+        e.stopPropagation();
+        onHoverResidue(null);
+      }}
     >
-      <boxGeometry args={[1, 1, 1]} />
+      <cylinderGeometry args={[0.5, 0.5, 1, 8]} />
       <meshStandardMaterial
-        roughness={0.2}
-        metalness={0.5}
+        roughness={0.25}
+        metalness={0.55}
         emissive="#1a0b2e"
-        emissiveIntensity={0.15}
+        emissiveIntensity={0.2}
         flatShading={false}
       />
     </instancedMesh>
