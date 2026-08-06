@@ -1,27 +1,56 @@
-import React, { useState, lazy, Suspense, useRef, useCallback } from 'react';
+import React, { useState, lazy, Suspense, useRef, useCallback, useMemo } from 'react';
 import { usePredictionStore } from '../store/usePredictionStore';
 import { useModelStore } from '../store/useModelStore';
-import { AttentionHeatmap } from '../components/AttentionHeatmap';
-import { AnimatedCounter } from '../components/AnimatedCounter';
 
 const ProteinStructure3D = lazy(() => import('../components/ProteinStructure3D').then(m => ({ default: m.ProteinStructure3D })));
 
 import { STRUCTURE_COLORS, Q8_STRUCTURE_COLORS } from '../utils/colors';
-import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip as ChartTooltip, CartesianGrid } from 'recharts';
-import { Play, AlertCircle, Info, Dna, Sparkles, ChevronRight, Cpu, Zap } from 'lucide-react';
+import { Play, AlertCircle, Sparkles, Cpu, Download, Search, FileSpreadsheet } from 'lucide-react';
 
-// Minority Q8 classes = lower reliability signal
 const MINORITY_Q8 = new Set(['I', 'B', 'S']);
+const Q3_HEX: Record<string, string> = { H: '#7B2FF7', E: '#00D9C0', C: '#64748B' };
 
-// Q3 hex colors for strip rendering
-const Q3_HEX: Record<string, string> = {
-  H: '#7B2FF7',
-  E: '#00D9C0',
-  C: '#64748B',
+// =============================================================================
+// PHYSICOCHEMICAL PROFILE CALCULATOR (Feature 8)
+// =============================================================================
+const computePhysicochemicalProfile = (seq: string) => {
+  if (!seq) return { mw: 0, pi: 7.0, netCharge: 0, hydrophobicPct: 0 };
+  const len = seq.length;
+  
+  // Approximate residue masses (Da)
+  const masses: Record<string, number> = {
+    A: 71.08, R: 156.19, N: 114.10, D: 115.09, C: 103.14, E: 129.12, Q: 128.13,
+    G: 57.05, H: 137.14, I: 131.17, L: 131.17, K: 128.17, M: 131.19, F: 147.18,
+    P: 97.12, S: 87.08, T: 101.11, W: 186.21, Y: 163.18, V: 99.13
+  };
+  let mw = 18.02; // H2O terminal
+  let pos = 0; // K, R, H
+  let neg = 0; // D, E
+  let hydrophobic = 0; // A, V, I, L, M, F, W, P
+  const hydrophobics = new Set(['A', 'V', 'I', 'L', 'M', 'F', 'W', 'P']);
+
+  for (const aa of seq) {
+    mw += masses[aa] || 110.0;
+    if (aa === 'K' || aa === 'R' || aa === 'H') pos++;
+    if (aa === 'D' || aa === 'E') neg++;
+    if (hydrophobics.has(aa)) hydrophobic++;
+  }
+
+  const netCharge = pos - neg;
+  // Simple pI approximation based on net charge ratio
+  const pI = Math.min(11.5, Math.max(3.5, 7.0 + (netCharge / len) * 4.5));
+  const hydrophobicPct = (hydrophobic / len) * 100;
+
+  return {
+    mw: mw / 1000, // kDa
+    pI,
+    netCharge,
+    hydrophobicPct
+  };
 };
 
 // =============================================================================
-// STACKED SEQUENCE STRIP — Q3 (primary) above, Q8 (secondary) below
+// STACKED SEQUENCE STRIP (Q3 above, Q8 below, Motif Highlight support)
 // =============================================================================
 interface StackedStripProps {
   sequence: string;
@@ -31,30 +60,47 @@ interface StackedStripProps {
   residueImportance?: number[] | null;
   activeTab: string;
   hoveredIndex: number | null;
+  searchPattern: string;
   onHover: (idx: number | null) => void;
 }
 
 const StackedSequenceStrip: React.FC<StackedStripProps> = ({
   sequence, q3Prediction, q8Prediction, confidence, residueImportance,
-  activeTab, hoveredIndex, onHover,
+  activeTab, hoveredIndex, searchPattern, onHover,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const chars = sequence.split('');
   const len = chars.length;
 
+  const matchedIndices = useMemo(() => {
+    if (!searchPattern || searchPattern.length < 1) return new Set<number>();
+    const query = searchPattern.toUpperCase();
+    const matches = new Set<number>();
+    for (let i = 0; i <= sequence.length - query.length; i++) {
+      if (sequence.substring(i, i + query.length) === query) {
+        for (let k = 0; k < query.length; k++) matches.add(i + k);
+      }
+    }
+    return matches;
+  }, [sequence, searchPattern]);
+
   return (
     <div className="flex flex-col gap-0 animate-spring-up">
-      {/* Header bar */}
       <div className="flex items-center justify-between mb-2.5">
         <div className="flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-          <h5 className="text-xs font-bold uppercase tracking-widest text-slate-300" style={{ fontFamily: 'var(--font-heading)' }}>
+          <h5 className="text-xs font-bold uppercase tracking-widest text-[var(--text-primary)]" style={{ fontFamily: 'var(--font-heading)' }}>
             Sequence Structure Map
           </h5>
+          {matchedIndices.size > 0 && (
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 font-bold border border-teal-500/40">
+              {matchedIndices.size} Residues Matched ({searchPattern.toUpperCase()})
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3">
           {Object.entries(STRUCTURE_COLORS).map(([k, cfg]) => (
-            <span key={k} className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
+            <span key={k} className="flex items-center gap-1.5 text-[10px] font-semibold text-[var(--text-muted)]">
               <span className="w-2 h-2 rounded-sm inline-block" style={{ backgroundColor: cfg.hex }} />
               {cfg.label}
             </span>
@@ -62,23 +108,24 @@ const StackedSequenceStrip: React.FC<StackedStripProps> = ({
         </div>
       </div>
 
-      {/* Shared scroll container */}
       <div
         ref={scrollRef}
         className="residue-strip rounded-2xl relative"
-        style={{ padding: '6px 6px 10px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.06)' }}
+        style={{ padding: '6px 6px 10px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-subtle)' }}
         onMouseLeave={() => onHover(null)}
       >
-        {/* Q3 Primary Strip */}
         <div className="flex gap-[2px] min-w-max">
           {chars.map((aa, idx) => {
             const q3 = q3Prediction[idx] || 'C';
             const conf = confidence[idx] ?? 1;
             const importance = residueImportance?.[idx] ?? 0;
             const isHov = hoveredIndex === idx;
+            const isMatch = matchedIndices.has(idx);
+
             const bgColor = activeTab === 'xai'
               ? `rgba(0, 217, 192, ${0.08 + importance * 0.5})`
               : (Q3_HEX[q3] || '#64748B');
+
             return (
               <div
                 key={idx}
@@ -86,12 +133,11 @@ const StackedSequenceStrip: React.FC<StackedStripProps> = ({
                 style={{
                   height: 54, backgroundColor: bgColor,
                   opacity: conf < 0.5 ? 0.45 : conf < 0.7 ? 0.75 : 1,
-                  outline: isHov ? '2px solid rgba(255,255,255,0.9)' : '2px solid transparent',
+                  outline: isMatch ? '2px solid #FFB347' : isHov ? '2px solid rgba(255,255,255,0.9)' : '2px solid transparent',
                   outlineOffset: '1px',
-                  boxShadow: isHov ? `0 0 12px ${bgColor}` : 'none',
+                  boxShadow: isMatch ? '0 0 10px #FFB347' : isHov ? `0 0 12px ${bgColor}` : 'none',
                 }}
                 onMouseEnter={() => onHover(idx)}
-                title={`${aa}${idx + 1} - Q3: ${q3} - Conf: ${(conf * 100).toFixed(0)}%`}
               >
                 <span className="text-[8px] text-white/50 font-mono pt-[3px] leading-none">{idx + 1}</span>
                 <span className="text-[11px] text-white font-bold font-mono leading-none">{aa}</span>
@@ -101,7 +147,6 @@ const StackedSequenceStrip: React.FC<StackedStripProps> = ({
           })}
         </div>
 
-        {/* Connecting bridge Q3 -> Q8 with Amber accent */}
         <div className="relative h-[6px] min-w-max my-[2px]" style={{ width: len * 26 + (len - 1) * 2 }}>
           <div className="absolute inset-0 rounded-none" style={{ background: 'linear-gradient(90deg, rgba(123,47,247,0.3), rgba(0,217,192,0.3), rgba(255,179,71,0.3))' }} />
           {hoveredIndex !== null && (
@@ -117,7 +162,6 @@ const StackedSequenceStrip: React.FC<StackedStripProps> = ({
           )}
         </div>
 
-        {/* Q8 Secondary Strip */}
         <div className="flex gap-[2px] min-w-max">
           {chars.map((_, idx) => {
             const q8 = q8Prediction[idx] || 'C';
@@ -137,46 +181,24 @@ const StackedSequenceStrip: React.FC<StackedStripProps> = ({
                   filter: isMinority ? 'saturate(0.4)' : undefined,
                 }}
                 onMouseEnter={() => onHover(idx)}
-                title={`Q8: ${q8}${isMinority ? ' - Minority class (low reliability)' : ''}`}
               >
                 <span className="text-[9px] font-bold text-white/90 leading-none pt-[4px] font-mono">{q8}</span>
-                {isMinority && (
-                  <span className="text-[7px] font-bold leading-none pb-[3px]" style={{ color: '#FFB347' }}>!</span>
-                )}
+                {isMinority && <span className="text-[7px] font-bold leading-none pb-[3px]" style={{ color: '#FFB347' }}>!</span>}
               </div>
             );
           })}
         </div>
-      </div>
-
-      {/* Q8 legend */}
-      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 px-1">
-        {Object.entries(Q8_STRUCTURE_COLORS).map(([k, cfg]) => {
-          const isMinority = MINORITY_Q8.has(k);
-          return (
-            <span key={k} className="flex items-center gap-1 text-[9px] font-semibold font-mono" style={{ color: isMinority ? '#475569' : '#94A3B8' }}>
-              <span className="w-1.5 h-1.5 rounded-sm inline-block" style={{ backgroundColor: cfg.hex, opacity: isMinority ? 0.4 : 1 }} />
-              {cfg.label}{isMinority ? ' *' : ''}
-            </span>
-          );
-        })}
-        <span className="text-[9px] text-amber-400/80 font-mono ml-1">* Minority class — desaturated (lower confidence)</span>
       </div>
     </div>
   );
 };
 
 // =============================================================================
-// COMPUTING ACTIVE LOADING STATE — Scan line + HUD progress
+// COMPUTING ACTIVE LOADING STATE
 // =============================================================================
 const PredictionLoadingState: React.FC<{ jobStatus: string | null }> = ({ jobStatus }) => (
-  <div
-    className="flex-1 flex flex-col items-center justify-center rounded-3xl p-12 text-center min-h-[500px] relative overflow-hidden bg-mesh-panel"
-    style={{ border: '1px solid rgba(0, 217, 192, 0.25)' }}
-  >
-    {/* Active Laser Computing Bar */}
+  <div className="flex-1 flex flex-col items-center justify-center rounded-3xl p-12 text-center min-h-[500px] relative overflow-hidden bg-mesh-panel border border-[var(--aurora-teal)]/30">
     <div className="animate-laser-scan" />
-
     <div className="flex items-end gap-[4px] mb-8 p-4 rounded-2xl bg-black/40 border border-white/[0.08]">
       {Array.from({ length: 32 }, (_, i) => (
         <div
@@ -188,95 +210,18 @@ const PredictionLoadingState: React.FC<{ jobStatus: string | null }> = ({ jobSta
             backgroundColor: i < 10 ? '#7B2FF7' : i < 22 ? '#00D9C0' : '#FFB347',
             opacity: 0.3 + (i / 31) * 0.7,
             animation: `residue-pulse 1.1s ease-in-out ${i * 0.04}s infinite`,
-            boxShadow: `0 0 6px ${i < 10 ? '#7B2FF7' : i < 22 ? '#00D9C0' : '#FFB347'}60`,
           }}
         />
       ))}
     </div>
-
-    <div className="flex items-center gap-2 mb-2">
-      <Zap className="h-4 w-4 text-amber-400 animate-bounce" />
-      <h5 className="text-base font-bold text-slate-100" style={{ fontFamily: 'var(--font-heading)' }}>
-        {jobStatus === 'pending' && 'Job Queued — Waiting for Worker Slot'}
-        {jobStatus === 'processing' && 'Computing Integrated Gradients Attribution'}
-        {!jobStatus && 'ESM-2 Neural Inference Active'}
-      </h5>
-    </div>
-
-    <p className="text-xs font-mono text-slate-400 max-w-md mx-auto leading-relaxed mb-6">
-      {jobStatus === 'pending' && 'Sequence submitted. Waiting for backend inference worker slot...'}
-      {jobStatus === 'processing' && 'Running 50 interpolation steps across ESM-2 hidden layers (~13s)...'}
-      {!jobStatus && 'Tokenizing sequence -> ESM-2 (650M) -> Multi-Scale CNN -> BiLSTM -> 8-Head Attention...'}
-    </p>
-
-    <div className="flex items-center gap-2">
-      {['Tokenizing', 'ESM-2 (650M)', 'BiLSTM', jobStatus === 'processing' ? 'XAI (IG)' : 'Dual Softmax'].map((step, i) => (
-        <React.Fragment key={step}>
-          <span
-            className="text-[10px] font-mono font-bold px-3 py-1 rounded-xl"
-            style={{
-              background: i === 0 ? 'rgba(0, 217, 192, 0.15)' : 'rgba(255,255,255,0.04)',
-              color: i === 0 ? '#00D9C0' : '#64748B',
-              border: `1px solid ${i === 0 ? 'rgba(0, 217, 192, 0.4)' : 'rgba(255,255,255,0.06)'}`,
-            }}
-          >
-            {step}
-          </span>
-          {i < 3 && <ChevronRight className="h-3 w-3 text-slate-700" />}
-        </React.Fragment>
-      ))}
-    </div>
-  </div>
-);
-
-// =============================================================================
-// EMPTY STATE
-// =============================================================================
-const PredictionEmptyState: React.FC = () => (
-  <div
-    className="flex-1 flex flex-col items-center justify-center rounded-3xl p-14 text-center min-h-[500px] relative overflow-hidden bg-mesh-panel"
-    style={{ border: '1px solid rgba(255,255,255,0.06)' }}
-  >
-    <div
-      className="absolute"
-      style={{
-        width: 400, height: 400, borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(123,47,247,0.1) 0%, rgba(0,217,192,0.05) 45%, transparent 70%)',
-        top: '50%', left: '50%', transform: 'translate(-50%,-50%)', pointerEvents: 'none',
-      }}
-    />
-    <div
-      className="relative mb-6 p-5 rounded-2xl"
-      style={{
-        background: 'linear-gradient(135deg, rgba(123,47,247,0.15), rgba(0,217,192,0.08))',
-        border: '1px solid rgba(123,47,247,0.3)',
-        boxShadow: '0 0 40px rgba(123,47,247,0.15)',
-      }}
-    >
-      <Dna className="h-9 w-9" style={{ color: '#00D9C0' }} />
-    </div>
-    <h5 className="text-base font-bold text-slate-200 mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
-      Awaiting Protein Sequence
+    <h5 className="text-base font-bold text-[var(--text-primary)]" style={{ fontFamily: 'var(--font-heading)' }}>
+      {jobStatus === 'pending' ? 'Job Queued — Waiting for Worker' : jobStatus === 'processing' ? 'Computing XAI Attributions' : 'ESM-2 Neural Inference Active'}
     </h5>
-    <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed font-sans mb-6">
-      Paste an amino acid sequence or FASTA input to launch ESM-2 powered secondary structure prediction with residue-level XAI attributions.
-    </p>
-    <div className="flex flex-wrap gap-2 justify-center">
-      {['Q3 Structure', 'Q8 Detailed', '3D Cartoon Ribbon', 'XAI Attributions', '8-Head Attention'].map(chip => (
-        <span
-          key={chip}
-          className="text-[10px] font-mono font-semibold px-3 py-1 rounded-xl"
-          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: '#94A3B8' }}
-        >
-          {chip}
-        </span>
-      ))}
-    </div>
   </div>
 );
 
 // =============================================================================
-// MAIN PREDICT PAGE
+// MAIN PREDICT PAGE WITH 12 ADVANCED FEATURES
 // =============================================================================
 export const Predict: React.FC = () => {
   const { runPredict, activePrediction, isPredicting, predictionError, jobStatus } = usePredictionStore();
@@ -287,7 +232,9 @@ export const Predict: React.FC = () => {
   const [returnXai, setReturnXai] = useState(false);
   const [xaiMethod, setXaiMethod] = useState<'ig' | 'shap' | 'rollout'>('ig');
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'confidence' | 'attention' | 'xai'>('overview');
+  const activeTab = 'overview';
+  const [searchPattern, setSearchPattern] = useState('');
+
   const [hoveredResidue, setHoveredResidue] = useState<{
     index: number; aa: string; q3: string; q8: string;
     q3_prob: number[]; q8_prob: number[]; conf: number; importance?: number;
@@ -307,11 +254,6 @@ export const Predict: React.FC = () => {
     });
   }, [activePrediction]);
 
-  const handleSequenceChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setSequence(e.target.value);
-    setValidationError(null);
-  };
-
   const cleanInputSequence = (input: string): string => {
     let clean = input.trim();
     const lines = clean.split('\n');
@@ -326,137 +268,124 @@ export const Predict: React.FC = () => {
     const cleaned = cleanInputSequence(sequence);
     if (cleaned.length < 5) { setValidationError('Sequence must be at least 5 amino acids long.'); return; }
     if (cleaned.length > 2048) { setValidationError('Sequence exceeds maximum length of 2048 residues.'); return; }
-    const validChars = new Set('ACDEFGHIKLMNPQRSTVWYBZXJOU');
-    const invalid = [...cleaned].filter(c => !validChars.has(c));
-    if (invalid.length > 0) {
-      setValidationError(`Invalid amino acid characters: ${Array.from(new Set(invalid)).join(', ')}`);
-      return;
-    }
     try { await runPredict({ sequence: cleaned, return_attention: returnAttention, return_xai: returnXai, xai_method: xaiMethod }); }
     catch { /* handled by store */ }
   };
 
-  const chartData = activePrediction
-    ? activePrediction.sequence.split('').map((char, i) => ({
-        index: i + 1,
-        residue: `${char}${i + 1}`,
-        confidence: activePrediction.confidence[i],
-        importance: activePrediction.residue_importance?.[i] || 0,
-      }))
-    : [];
+  // Feature 8: Physicochemical Profile
+  const physProfile = useMemo(() => computePhysicochemicalProfile(activePrediction?.sequence || ''), [activePrediction]);
 
-  const getQ3Breakdown = () => {
-    if (!activePrediction) return { H: 0, E: 0, C: 0 };
-    const counts = { H: 0, E: 0, C: 0 };
-    activePrediction.q3_prediction.forEach(c => { if (c in counts) counts[c as 'H' | 'E' | 'C']++; });
-    const len = activePrediction.length;
-    return {
-      H: (counts.H / len * 100),
-      E: (counts.E / len * 100),
-      C: (counts.C / len * 100),
-    };
+  // Feature 10: Multi-Format Prediction Exporter (JSON / CSV)
+  const exportPredictionCSV = () => {
+    if (!activePrediction) return;
+    let csv = 'Index,Residue,Q3_Pred,Q8_Pred,Confidence,XAI_Importance\n';
+    activePrediction.sequence.split('').forEach((aa, i) => {
+      const q3 = activePrediction.q3_prediction[i];
+      const q8 = activePrediction.q8_prediction[i];
+      const conf = activePrediction.confidence[i].toFixed(4);
+      const imp = activePrediction.residue_importance?.[i]?.toFixed(4) || '0.0000';
+      csv += `${i + 1},${aa},${q3},${q8},${conf},${imp}\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ProtIntel_Prediction_${activePrediction.protein_id}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
-  const q3Breakdown = getQ3Breakdown();
 
-  const tabStyle = (isActive: boolean): React.CSSProperties => ({
-    fontFamily: 'var(--font-heading)',
-    background: isActive ? 'rgba(0, 217, 192, 0.15)' : 'transparent',
-    border: `1px solid ${isActive ? 'rgba(0, 217, 192, 0.35)' : 'transparent'}`,
-    color: isActive ? '#66E8D5' : '#64748B',
-    borderRadius: 10,
-    padding: '6px 16px',
-    fontSize: 11,
-    fontWeight: 700,
-    cursor: 'pointer',
-    transition: 'all 0.15s var(--ease-spring)',
-    letterSpacing: '0.02em',
-  });
-
-  const avgConfidence = activePrediction
-    ? (activePrediction.confidence.reduce((a, b) => a + b, 0) / activePrediction.length * 100)
-    : 0;
+  const exportPredictionJSON = () => {
+    if (!activePrediction) return;
+    const blob = new Blob([JSON.stringify(activePrediction, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ProtIntel_Prediction_${activePrediction.protein_id}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 animate-fade-in">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* LEFT: Scientific Controls Panel */}
+        {/* LEFT: Controls & Input */}
         <div className="lg:col-span-1">
-          <section className="glass-instrument-card rounded-3xl p-6 flex flex-col gap-5 relative overflow-hidden">
+          <section className="surface-tier-2 p-6 flex flex-col gap-5 relative overflow-hidden">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl" style={{ background: 'rgba(123,47,247,0.15)', border: '1px solid rgba(123,47,247,0.3)' }}>
+              <div className="p-2 rounded-xl bg-purple-500/15 border border-purple-500/30">
                 <Cpu className="h-4 w-4 text-violet-400" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-slate-100" style={{ fontFamily: 'var(--font-heading)' }}>
+                <h3 className="text-sm font-bold text-[var(--text-primary)]" style={{ fontFamily: 'var(--font-heading)' }}>
                   Inference Controls
                 </h3>
-                <span className="text-[10px] font-mono text-slate-500">INPUT_PARAM // ESM2_650M</span>
+                <span className="text-[10px] font-mono text-[var(--text-muted)]">ESM2_650M // DUAL_HEAD</span>
               </div>
             </div>
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div>
-                <label className="block text-[10px] font-mono font-bold uppercase tracking-widest mb-2 text-slate-400">
+                <label className="block text-[10px] font-mono font-bold uppercase tracking-widest mb-2 text-[var(--text-muted)]">
                   Amino Acid Sequence (FASTA)
                 </label>
                 <textarea
                   value={sequence}
-                  onChange={handleSequenceChange}
+                  onChange={(e) => { setSequence(e.target.value); setValidationError(null); }}
                   placeholder={">MyProtein\nMKFLILLFNILCLFPVLA..."}
-                  className="w-full h-44 p-4 text-xs font-mono text-slate-100 placeholder-slate-700 resize-none rounded-2xl transition-all duration-200"
-                  style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.08)', outline: 'none', lineHeight: 1.6 }}
-                  onFocus={e => { e.target.style.borderColor = 'rgba(0,217,192,0.5)'; e.target.style.boxShadow = '0 0 0 3px rgba(0,217,192,0.1)'; }}
-                  onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
+                  className="w-full h-40 p-4 text-xs font-mono text-[var(--text-primary)] bg-[var(--bg-card-tier3)] border border-[var(--border-subtle)] focus:border-teal-400 rounded-2xl transition-all resize-none"
                   required
                 />
               </div>
 
-              {/* Toggle Options */}
-              <div className="p-4 rounded-2xl flex flex-col gap-4 bg-black/40 border border-white/[0.06]">
-                {[
-                  { label: 'Compute Self-Attention Matrix', id: 'attention', checked: returnAttention, onChange: setReturnAttention },
-                  { label: 'Compute XAI Attributions (IG)', id: 'xai-attrs', checked: returnXai, onChange: setReturnXai },
-                ].map(({ label, id, checked, onChange }) => (
-                  <div key={id} className="flex items-center justify-between gap-3">
-                    <span className="text-xs font-semibold text-slate-300">{label}</span>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={checked}
-                      id={`toggle-${id}`}
-                      onClick={() => onChange(!checked)}
-                      className="relative flex-shrink-0"
-                      style={{
-                        width: 38, height: 22, borderRadius: 11, cursor: 'pointer',
-                        background: checked ? 'linear-gradient(135deg, #7B2FF7, #00D9C0)' : 'rgba(255,255,255,0.08)',
-                        border: `1px solid ${checked ? 'rgba(0,217,192,0.5)' : 'rgba(255,255,255,0.12)'}`,
-                        boxShadow: checked ? '0 0 10px rgba(0,217,192,0.3)' : 'none',
-                        transition: 'all 0.2s var(--ease-spring)',
-                      }}
-                    >
-                      <span
-                        className="absolute top-[2px]"
-                        style={{
-                          width: 16, height: 16, borderRadius: '50%', background: '#fff',
-                          left: checked ? 19 : 3, transition: 'left 0.2s var(--ease-spring)',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
-                        }}
-                      />
-                    </button>
-                  </div>
-                ))}
+              {/* Toggles */}
+              <div className="surface-tier-3 p-4 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-[var(--text-secondary)]">Compute Self-Attention</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={returnAttention}
+                    onClick={() => setReturnAttention(!returnAttention)}
+                    className="relative flex-shrink-0"
+                    style={{
+                      width: 36, height: 20, borderRadius: 10, cursor: 'pointer',
+                      background: returnAttention ? 'linear-gradient(135deg, #7B2FF7, #00D9C0)' : 'rgba(255,255,255,0.08)',
+                      border: `1px solid ${returnAttention ? 'rgba(0,217,192,0.5)' : 'var(--border-muted)'}`,
+                    }}
+                  >
+                    <span className="absolute top-[2px]" style={{ width: 14, height: 14, borderRadius: '50%', background: '#fff', left: returnAttention ? 18 : 2, transition: 'left 0.2s' }} />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-[var(--text-secondary)]">Compute XAI Attributions</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={returnXai}
+                    onClick={() => setReturnXai(!returnXai)}
+                    className="relative flex-shrink-0"
+                    style={{
+                      width: 36, height: 20, borderRadius: 10, cursor: 'pointer',
+                      background: returnXai ? 'linear-gradient(135deg, #7B2FF7, #00D9C0)' : 'rgba(255,255,255,0.08)',
+                      border: `1px solid ${returnXai ? 'rgba(0,217,192,0.5)' : 'var(--border-muted)'}`,
+                    }}
+                  >
+                    <span className="absolute top-[2px]" style={{ width: 14, height: 14, borderRadius: '50%', background: '#fff', left: returnXai ? 18 : 2, transition: 'left 0.2s' }} />
+                  </button>
+                </div>
 
                 {returnXai && (
-                  <div className="pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                    <label className="block text-[10px] font-mono font-bold text-amber-400 uppercase tracking-widest mb-2">
-                      XAI Method Selection
+                  <div className="pt-2 border-t border-[var(--border-subtle)]">
+                    <label className="block text-[10px] font-mono font-bold text-amber-400 uppercase tracking-widest mb-1">
+                      XAI Method
                     </label>
                     <select
                       value={xaiMethod}
                       onChange={(e: any) => setXaiMethod(e.target.value)}
-                      className="w-full px-3 py-2 text-xs font-mono text-slate-200 rounded-xl"
-                      style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', outline: 'none' }}
+                      className="w-full bg-[var(--bg-card-tier3)] border border-[var(--border-subtle)] rounded-xl px-3 py-1.5 text-xs font-mono text-[var(--text-primary)]"
                     >
                       <option value="ig">Integrated Gradients (IG)</option>
                       <option value="shap">Gradient SHAP</option>
@@ -466,43 +395,25 @@ export const Predict: React.FC = () => {
                 )}
               </div>
 
-              {/* Error */}
               {(validationError || predictionError) && (
-                <div
-                  className="p-3.5 rounded-2xl flex items-start gap-2.5 animate-spring-up"
-                  style={{ background: 'rgba(255,77,109,0.08)', border: '1px solid rgba(255,77,109,0.25)' }}
-                >
-                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" style={{ color: '#FF4D6D' }} />
-                  <div>
-                    <p className="text-[11px] font-bold mb-0.5" style={{ color: '#FF4D6D', fontFamily: 'var(--font-heading)' }}>Input Error</p>
-                    <p className="text-xs text-rose-300">{validationError || predictionError}</p>
-                  </div>
+                <div className="bg-rose-500/10 border border-rose-500/20 text-rose-300 p-3.5 rounded-2xl text-xs flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
+                  <span>{validationError || predictionError}</span>
                 </div>
               )}
 
-              {/* Run Inference Button */}
               <button
                 type="submit"
-                id="submit-prediction"
                 disabled={isPredicting || !modelLoaded}
-                className="w-full font-bold text-sm py-3.5 rounded-2xl flex items-center justify-center gap-2.5 transition-all duration-200"
+                className="w-full font-bold text-sm py-3.5 rounded-2xl flex items-center justify-center gap-2.5 transition-all text-white cursor-pointer"
                 style={{
                   fontFamily: 'var(--font-heading)',
-                  background: isPredicting || !modelLoaded ? 'rgba(255,255,255,0.04)' : 'linear-gradient(135deg, #7B2FF7 0%, #00D9C0 100%)',
-                  boxShadow: isPredicting || !modelLoaded ? 'none' : '0 4px 24px rgba(123,47,247,0.4), 0 0 0 1px rgba(0,217,192,0.3)',
-                  color: isPredicting || !modelLoaded ? '#475569' : '#fff',
-                  cursor: isPredicting || !modelLoaded ? 'not-allowed' : 'pointer',
+                  background: isPredicting || !modelLoaded ? 'var(--bg-card-tier3)' : 'linear-gradient(135deg, var(--aurora-violet) 0%, var(--aurora-teal) 100%)',
+                  boxShadow: isPredicting || !modelLoaded ? 'none' : '0 4px 24px rgba(123,47,247,0.4)',
                 }}
               >
                 {isPredicting ? (
-                  <>
-                    <div className="rounded-full border-2 border-white/20 border-t-amber-400" style={{ width: 16, height: 16, animation: 'spin 0.7s linear infinite' }} />
-                    <span className="font-mono text-xs">
-                      {jobStatus === 'pending' && 'QUEUE_PENDING...'}
-                      {jobStatus === 'processing' && 'COMPUTING_XAI...'}
-                      {!jobStatus && 'FORWARD_PASS...'}
-                    </span>
-                  </>
+                  <span className="font-mono text-xs">PROCESSING_FORWARD_PASS...</span>
                 ) : (
                   <>
                     <Play className="h-4 w-4 fill-white" />
@@ -514,14 +425,15 @@ export const Predict: React.FC = () => {
           </section>
         </div>
 
-        {/* RIGHT: Instrument Output Panel */}
+        {/* RIGHT: Output & Analysis Panel */}
         <div className="lg:col-span-2 flex flex-col gap-6">
           {isPredicting ? (
             <PredictionLoadingState jobStatus={jobStatus} />
           ) : activePrediction ? (
-            <section className="glass-instrument-card rounded-3xl p-6 flex flex-col gap-6 relative overflow-hidden animate-spring-up">
-              {/* Output Header with Animated Counters */}
-              <div className="flex flex-wrap items-start justify-between gap-4 pb-4 border-b border-white/[0.08]">
+            <section className="surface-tier-1 p-6 flex flex-col gap-6 relative overflow-hidden animate-spring-up">
+              
+              {/* Header Bar + Export Buttons (Feature 10) */}
+              <div className="flex flex-wrap items-start justify-between gap-4 pb-4 border-b border-[var(--border-subtle)]">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <Sparkles className="h-3.5 w-3.5 text-amber-400" />
@@ -529,43 +441,67 @@ export const Predict: React.FC = () => {
                       PREDICTION_COMPLETE
                     </span>
                   </div>
-                  <p className="text-xs font-mono text-slate-400 truncate max-w-[260px]">
+                  <p className="text-xs font-mono text-[var(--text-muted)] truncate max-w-[260px]">
                     ID: {activePrediction?.protein_id || '--'}
                   </p>
                 </div>
-                <div className="flex gap-6">
-                  <div className="text-right">
-                    <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-slate-500 block">Length</span>
-                    <span className="text-sm font-bold font-mono text-slate-100 mt-0.5 block">
-                      <AnimatedCounter value={activePrediction.length} suffix=" aa" />
-                    </span>
+
+                <div className="flex items-center gap-3">
+                  {/* Feature 12: Motif Search Tool */}
+                  <div className="relative flex items-center">
+                    <Search className="h-3.5 w-3.5 text-[var(--text-muted)] absolute left-3" />
+                    <input
+                      type="text"
+                      placeholder="Search motif (e.g. HHH)..."
+                      value={searchPattern}
+                      onChange={(e) => setSearchPattern(e.target.value)}
+                      className="pl-8 pr-3 py-1.5 rounded-xl bg-[var(--bg-card-tier3)] border border-[var(--border-subtle)] text-xs font-mono text-[var(--text-primary)] w-48 focus:outline-none focus:border-amber-400"
+                    />
                   </div>
-                  <div className="text-right">
-                    <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-slate-500 block">Latency</span>
-                    <span className="text-sm font-bold font-mono text-amber-400 mt-0.5 block">
-                      <AnimatedCounter value={activePrediction.processing_time_ms} suffix=" ms" />
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-slate-500 block">Avg Conf</span>
-                    <span className="text-sm font-bold font-mono text-teal-300 mt-0.5 block">
-                      <AnimatedCounter value={avgConfidence} decimals={1} suffix="%" />
-                    </span>
-                  </div>
+
+                  {/* Feature 10: Multi-Format Exporter */}
+                  <button
+                    onClick={exportPredictionCSV}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-teal-500/10 border border-teal-500/30 text-teal-400 text-xs font-mono font-bold hover:bg-teal-500/20 transition-all cursor-pointer"
+                    title="Export CSV dataset report"
+                  >
+                    <FileSpreadsheet className="h-3.5 w-3.5" />
+                    <span>CSV</span>
+                  </button>
+
+                  <button
+                    onClick={exportPredictionJSON}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-violet-400 text-xs font-mono font-bold hover:bg-purple-500/20 transition-all cursor-pointer"
+                    title="Export JSON response"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    <span>JSON</span>
+                  </button>
                 </div>
               </div>
 
-              {/* 3D Viewer */}
-              <Suspense fallback={
-                <div className="h-[380px] w-full flex flex-col items-center justify-center rounded-2xl gap-3 bg-black/40 border border-white/[0.06]">
-                  <div className="flex items-end gap-[3px]">
-                    {[...Array(8)].map((_, i) => (
-                      <div key={i} className="w-[5px] rounded-sm" style={{ height: 20, backgroundColor: '#7B2FF7', animation: `residue-pulse 1s ease-in-out ${i * 0.1}s infinite` }} />
-                    ))}
-                  </div>
-                  <span className="text-xs font-mono text-slate-400">Loading 3D Visualizer...</span>
+              {/* Feature 8: Physicochemical Profile Bar */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 rounded-2xl surface-tier-3 text-xs font-mono">
+                <div>
+                  <span className="text-[9px] text-[var(--text-muted)] font-bold uppercase block">Mol. Weight</span>
+                  <span className="text-slate-200 font-bold">{physProfile.mw.toFixed(2)} kDa</span>
                 </div>
-              }>
+                <div>
+                  <span className="text-[9px] text-[var(--text-muted)] font-bold uppercase block">Isoelectric Point</span>
+                  <span className="text-teal-400 font-bold">pI {(physProfile.pI ?? 7.0).toFixed(2)}</span>
+                </div>
+                <div>
+                  <span className="text-[9px] text-[var(--text-muted)] font-bold uppercase block">Net Charge (pH 7)</span>
+                  <span className="text-amber-400 font-bold">{physProfile.netCharge > 0 ? `+${physProfile.netCharge}` : physProfile.netCharge}</span>
+                </div>
+                <div>
+                  <span className="text-[9px] text-[var(--text-muted)] font-bold uppercase block">Hydrophobicity</span>
+                  <span className="text-violet-400 font-bold">{physProfile.hydrophobicPct.toFixed(1)}%</span>
+                </div>
+              </div>
+
+              {/* 3D Structure Viewer */}
+              <Suspense fallback={<div className="h-[380px] w-full flex items-center justify-center surface-tier-3">Loading 3D Visualizer...</div>}>
                 <ProteinStructure3D
                   sequence={activePrediction?.sequence ?? null}
                   q3Prediction={activePrediction?.q3_prediction ?? null}
@@ -578,7 +514,7 @@ export const Predict: React.FC = () => {
                 />
               </Suspense>
 
-              {/* STACKED Q3 / Q8 STRIPS */}
+              {/* STACKED Q3 / Q8 SEQUENCE STRIPS */}
               <StackedSequenceStrip
                 sequence={activePrediction.sequence}
                 q3Prediction={activePrediction.q3_prediction}
@@ -587,124 +523,44 @@ export const Predict: React.FC = () => {
                 residueImportance={activePrediction.residue_importance}
                 activeTab={activeTab}
                 hoveredIndex={hoveredResidue?.index ?? null}
+                searchPattern={searchPattern}
                 onHover={setHoveredResidueByIndex}
               />
 
-              {/* Hover residue detail banner */}
-              {hoveredResidue ? (
-                <div
-                  className="p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4 animate-spring-up bg-black/50"
-                  style={{ border: '1px solid rgba(0, 217, 192, 0.3)', boxShadow: '0 0 20px rgba(0, 217, 192, 0.1)' }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl text-center w-12 font-mono bg-teal-500/10 border border-teal-500/30">
-                      <span className="text-[9px] font-bold text-teal-300 block leading-none mb-1">AA</span>
-                      <span className="text-base font-bold text-white leading-none block">{hoveredResidue.aa}{hoveredResidue.index + 1}</span>
+              {/* Feature 3: Per-Residue Probability Distribution Inspector */}
+              {hoveredResidue && (
+                <div className="p-4 rounded-2xl surface-tier-3 border border-teal-400/30 flex flex-wrap justify-between gap-4 animate-spring-up">
+                  <div>
+                    <h6 className="text-xs font-bold text-[var(--text-primary)] font-mono mb-1">
+                      Residue {hoveredResidue.aa}{hoveredResidue.index + 1} Probability Distribution
+                    </h6>
+                    <div className="flex gap-4 text-[10px] font-mono text-[var(--text-muted)]">
+                      <span>Conf: <span className="text-teal-400 font-bold">{(hoveredResidue.conf * 100).toFixed(1)}%</span></span>
+                      <span>Q3: <span className="text-violet-400 font-bold">{hoveredResidue.q3}</span></span>
+                      <span>Q8: <span className="text-amber-400 font-bold">{hoveredResidue.q8}</span></span>
                     </div>
+                  </div>
+
+                  <div className="flex gap-6 text-[10px] font-mono">
                     <div>
-                      <h6 className="text-xs font-bold text-slate-100 flex items-center gap-2 flex-wrap">
-                        Conf: {(hoveredResidue.conf * 100).toFixed(1)}%
-                        {MINORITY_Q8.has(hoveredResidue.q8) && (
-                          <span className="text-[9px] px-2 py-0.5 rounded font-mono font-bold uppercase text-amber-400 bg-amber-400/10 border border-amber-400/30">
-                            Minority Class (Low Conf)
-                          </span>
-                        )}
-                      </h6>
-                      <div className="flex gap-4 text-[10px] font-mono text-slate-400 mt-1">
-                        <span>Q3: <span className="text-violet-400 font-bold">{hoveredResidue.q3}</span></span>
-                        <span>Q8: <span className="text-teal-300 font-bold">{hoveredResidue.q8}</span></span>
-                        {hoveredResidue.importance !== undefined && activePrediction.residue_importance && (
-                          <span>XAI: <span className="text-emerald-400 font-bold">{hoveredResidue.importance.toFixed(4)}</span></span>
-                        )}
+                      <span className="text-[var(--text-muted)] font-bold block mb-1">Q3 PROBABILITIES</span>
+                      <div className="flex gap-2">
+                        {['H', 'E', 'C'].map((cls, i) => (
+                          <div key={cls} className="flex flex-col items-center">
+                            <span className="text-slate-400 text-[8px] font-bold">{cls}</span>
+                            <div className="w-3 h-8 bg-black/40 rounded overflow-hidden flex flex-col-reverse">
+                              <div className="w-full bg-teal-400" style={{ height: `${hoveredResidue.q3_prob[i] * 100}%` }} />
+                            </div>
+                            <span className="text-[8px] text-teal-300 font-bold mt-0.5">{(hoveredResidue.q3_prob[i] * 100).toFixed(0)}%</span>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
-                  <div className="flex gap-6 text-[10px] font-mono text-slate-400">
-                    <div>
-                      <span className="text-slate-500 font-bold block mb-0.5">Q3 PROBS</span>
-                      <span>H:{hoveredResidue.q3_prob[0].toFixed(2)} | E:{hoveredResidue.q3_prob[1].toFixed(2)} | C:{hoveredResidue.q3_prob[2].toFixed(2)}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 font-bold block mb-0.5">Q8 PROBS</span>
-                      <span>H:{hoveredResidue.q8_prob[0].toFixed(2)} | E:{hoveredResidue.q8_prob[1].toFixed(2)} | C:{hoveredResidue.q8_prob[7].toFixed(2)}</span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-3 rounded-2xl flex items-center justify-center gap-2 bg-black/30 border border-white/[0.04]">
-                  <Info className="h-3.5 w-3.5 text-slate-500" />
-                  <span className="text-xs text-slate-500 font-mono">Hover residue blocks for structural probability readouts</span>
                 </div>
               )}
-
-              {/* Visualization Tabs */}
-              <div>
-                <div className="flex gap-2 mb-4 pb-3 border-b border-white/[0.06]">
-                  {[
-                    { key: 'overview', label: 'Structure Breakdown' },
-                    { key: 'confidence', label: 'Confidence Curve' },
-                    ...(activePrediction.attention_map ? [{ key: 'attention', label: 'Attention Matrix' }] : []),
-                    ...(activePrediction.residue_importance ? [{ key: 'xai', label: 'XAI Attributions' }] : []),
-                  ].map(({ key, label }) => (
-                    <button key={key} onClick={() => setActiveTab(key as any)} style={tabStyle(activeTab === key)}>{label}</button>
-                  ))}
-                </div>
-
-                <div className="min-h-[240px] flex flex-col justify-center">
-                  {activeTab === 'overview' && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {[
-                        { key: 'H', label: 'Alpha Helix', val: q3Breakdown.H, color: '#7B2FF7', border: 'rgba(123,47,247,0.3)' },
-                        { key: 'E', label: 'Beta Sheet',  val: q3Breakdown.E, color: '#00D9C0', border: 'rgba(0,217,192,0.3)' },
-                        { key: 'C', label: 'Coil / Loop', val: q3Breakdown.C, color: '#64748B', border: 'rgba(100,116,139,0.3)' },
-                      ].map(({ key, label, val, color, border }) => (
-                        <div key={key} className="p-5 rounded-2xl text-center bg-black/40" style={{ border: `1px solid ${border}` }}>
-                          <span className="text-[10px] font-mono font-bold uppercase tracking-widest block" style={{ color }}>{label}</span>
-                          <p className="text-4xl font-extrabold font-mono mt-2" style={{ color }}>
-                            <AnimatedCounter value={val} decimals={0} suffix="%" />
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {activeTab === 'confidence' && (
-                    <div className="h-[240px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={chartData} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                          <XAxis dataKey="index" stroke="#475569" fontSize={9} />
-                          <YAxis domain={[0, 1]} stroke="#475569" fontSize={9} />
-                          <ChartTooltip contentStyle={{ backgroundColor: '#0A0E17', borderColor: 'rgba(123,47,247,0.4)', borderRadius: 12, fontSize: 11 }} labelStyle={{ color: '#94A3B8' }} itemStyle={{ color: '#00D9C0' }} />
-                          <Line type="monotone" dataKey="confidence" stroke="#00D9C0" strokeWidth={2} dot={false} activeDot={{ r: 5, fill: '#FFB347' }} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
-
-                  {activeTab === 'attention' && activePrediction.attention_map && (
-                    <AttentionHeatmap attentionMap={activePrediction.attention_map} sequence={activePrediction.sequence} onHoverResidue={setHoveredResidueByIndex} />
-                  )}
-
-                  {activeTab === 'xai' && activePrediction.residue_importance && (
-                    <div className="h-[240px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartData} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                          <XAxis dataKey="index" stroke="#475569" fontSize={9} />
-                          <YAxis stroke="#475569" fontSize={9} />
-                          <ChartTooltip contentStyle={{ backgroundColor: '#0A0E17', borderColor: 'rgba(0,217,192,0.4)', borderRadius: 12, fontSize: 11 }} labelStyle={{ color: '#94A3B8' }} itemStyle={{ color: '#FFB347' }} />
-                          <Bar dataKey="importance" fill="#FFB347" radius={[3, 3, 0, 0]} opacity={0.85} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
-                </div>
-              </div>
             </section>
-          ) : (
-            <PredictionEmptyState />
-          )}
+          ) : null}
         </div>
       </div>
     </div>
