@@ -8,27 +8,33 @@ const Predict = lazy(() => import('./pages/Predict').then(m => ({ default: m.Pre
 const Batch = lazy(() => import('./pages/Batch').then(m => ({ default: m.Batch })));
 const Evaluation = lazy(() => import('./pages/Evaluation').then(m => ({ default: m.Evaluation })));
 
-// Aurora-branded page loader — residue strip pulsing left-to-right
+// Scientific HUD Page Loader — Strand Pulse + Technical Readout
 const STRAND_COLORS = ['#7B2FF7','#9B59F5','#A16AE8','#00D9C0','#66E8D5','#FFB347','#9B59F5','#7B2FF7'];
 
 const PageLoader: React.FC = () => (
-  <div className="flex h-64 flex-col items-center justify-center gap-4">
-    <div className="flex items-end gap-[3px]" role="status" aria-label="Loading page">
+  <div className="flex h-72 flex-col items-center justify-center gap-4">
+    <div className="flex items-end gap-[4px] p-3 rounded-2xl bg-black/40 border border-white/[0.06]" role="status" aria-label="Loading page">
       {STRAND_COLORS.map((hex, i) => (
         <div
           key={i}
-          className="w-[6px] rounded-full"
+          className="w-[5px] rounded-full"
           style={{
-            height: 32,
+            height: 28,
             backgroundColor: hex,
-            animation: `residue-pulse 1.1s ease-in-out ${i * 0.1}s infinite`,
+            animation: `residue-pulse 1.1s ease-in-out ${i * 0.08}s infinite`,
+            boxShadow: `0 0 8px ${hex}80`,
           }}
         />
       ))}
     </div>
-    <span className="text-xs font-semibold text-slate-500 tracking-widest uppercase" style={{ fontFamily: 'var(--font-heading)' }}>
-      Loading Module
-    </span>
+    <div className="flex flex-col items-center gap-1">
+      <span className="text-xs font-bold text-slate-300 tracking-widest uppercase" style={{ fontFamily: 'var(--font-heading)' }}>
+        INITIALIZING INSTRUMENT MODULE
+      </span>
+      <span className="text-[10px] font-mono text-slate-600 tracking-wider">
+        SYS_LOADER // PARSING_CHUNKS
+      </span>
+    </div>
   </div>
 );
 

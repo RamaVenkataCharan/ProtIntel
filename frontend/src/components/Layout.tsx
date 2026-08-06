@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useModelStore } from '../store/useModelStore';
-import { Activity, Server, AlertTriangle, BarChart3, Database, Layers } from 'lucide-react';
+import { useThemeStore } from '../store/useThemeStore';
+import { Activity, Server, AlertTriangle, BarChart3, Database, Layers, Sun, Moon } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -9,6 +10,7 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { isHealthy, modelLoaded, device, checkStatus, error } = useModelStore();
+  const { theme, toggleTheme } = useThemeStore();
   const location = useLocation();
 
   useEffect(() => {
@@ -26,31 +28,35 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   ];
 
   return (
-    <div className="min-h-screen text-gray-100 flex flex-col" style={{ backgroundColor: 'var(--bg-deep)', fontFamily: 'var(--font-body)' }}>
-      {/* Premium Glassmorphic Navbar */}
-      <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#0a0e17]/80 border-b border-white/[0.06] px-6 py-3.5 flex items-center justify-between" style={{ boxShadow: '0 1px 0 rgba(255,255,255,0.04)' }}>
+    <div
+      data-theme={theme}
+      className="min-h-screen flex flex-col relative bg-mesh-panel bg-ambient-grid transition-colors duration-300"
+      style={{ fontFamily: 'var(--font-body)', color: 'var(--text-primary)' }}
+    >
+      {/* Scientific Instrument Navbar */}
+      <header className="sticky top-0 z-50 backdrop-blur-xl bg-[var(--bg-surface)]/85 border-b border-[var(--border-subtle)] px-6 py-3 flex items-center justify-between shadow-lg">
         <div className="flex items-center gap-3">
           <div
             className="p-2 rounded-xl"
             style={{
-              background: 'linear-gradient(135deg, #7B2FF7 0%, #00D9C0 100%)',
-              boxShadow: '0 0 16px rgba(123,47,247,0.4), 0 0 32px rgba(0,217,192,0.15)',
+              background: 'linear-gradient(135deg, var(--aurora-violet) 0%, var(--aurora-teal) 100%)',
+              boxShadow: '0 0 16px rgba(123,47,247,0.3)',
             }}
           >
             <Layers className="h-5 w-5 text-white" />
           </div>
           <div>
             <h1
-              className="text-lg font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-teal-300"
+              className="text-lg font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-teal-400 to-amber-400"
               style={{ fontFamily: 'var(--font-heading)' }}
             >
               ProtIntel
             </h1>
-            <p className="text-[11px] text-slate-500 font-medium leading-none mt-0.5">Explainable Protein Analysis</p>
+            <p className="text-[10px] text-[var(--text-muted)] font-mono leading-none mt-0.5 tracking-wider uppercase">SYS_INSTRUMENT // ESM2-BiLSTM</p>
           </div>
         </div>
 
-        <nav className="flex items-center gap-0.5">
+        <nav className="flex items-center gap-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
@@ -58,49 +64,68 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                className={`relative flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 ${
                   isActive
-                    ? 'text-white'
-                    : 'text-slate-400 hover:text-slate-100 hover:bg-white/[0.04]'
+                    ? 'text-[var(--text-primary)]'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--border-subtle)]'
                 }`}
-                style={isActive ? { fontFamily: 'var(--font-heading)' } : { fontFamily: 'var(--font-heading)' }}
+                style={{ fontFamily: 'var(--font-heading)' }}
               >
                 {isActive && (
                   <span
                     className="absolute inset-0 rounded-xl"
                     style={{
                       background: 'linear-gradient(135deg, rgba(123,47,247,0.18) 0%, rgba(0,217,192,0.08) 100%)',
-                      border: '1px solid rgba(123,47,247,0.3)',
-                      boxShadow: '0 0 12px rgba(123,47,247,0.1)',
+                      border: '1px solid var(--border-glow)',
+                      boxShadow: '0 0 12px rgba(123,47,247,0.12)',
                     }}
                   />
                 )}
-                <Icon className="relative h-4 w-4" />
+                <Icon className="relative h-3.5 w-3.5" />
                 <span className="relative">{item.label}</span>
               </Link>
             );
           })}
         </nav>
 
-        {/* Backend Status Summary */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 bg-slate-900/60 border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
-            <Server className="h-3.5 w-3.5 text-slate-400" />
-            <span className="text-slate-300 font-medium">CPU Device:</span>
-            <span className="text-slate-400 font-semibold uppercase">{device}</span>
+        {/* Header Actions & Backend Status */}
+        <div className="flex items-center gap-3">
+          {/* Light/Dark Theme Toggle Button */}
+          <button
+            onClick={toggleTheme}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--bg-raised)] border border-[var(--border-subtle)] hover:border-[var(--aurora-violet)] transition-all cursor-pointer text-xs font-bold"
+            title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
+          >
+            {theme === 'dark' ? (
+              <>
+                <Sun className="h-3.5 w-3.5 text-amber-400" />
+                <span className="text-slate-300 font-mono text-[11px]">LIGHT</span>
+              </>
+            ) : (
+              <>
+                <Moon className="h-3.5 w-3.5 text-purple-600" />
+                <span className="text-slate-700 font-mono text-[11px]">DARK</span>
+              </>
+            )}
+          </button>
+
+          <div className="flex items-center gap-2 bg-[var(--bg-raised)] border border-[var(--border-subtle)] px-3 py-1.5 rounded-xl text-xs font-mono">
+            <Server className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+            <span className="text-[var(--text-muted)] font-medium">DEVICE:</span>
+            <span className="text-amber-500 font-bold uppercase">{device}</span>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <span className="relative flex h-2.5 w-2.5">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--bg-raised)] border border-[var(--border-subtle)]">
+            <span className="relative flex h-2 w-2">
               <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
                 isHealthy && modelLoaded ? 'bg-emerald-400' : 'bg-rose-400'
               }`}></span>
-              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${
                 isHealthy && modelLoaded ? 'bg-emerald-500' : 'bg-rose-500'
               }`}></span>
             </span>
-            <span className="text-xs font-semibold text-slate-300">
-              {isHealthy && modelLoaded ? 'System Ready' : 'System Offline'}
+            <span className="text-xs font-mono font-semibold tracking-wider text-[var(--text-secondary)]">
+              {isHealthy && modelLoaded ? 'ONLINE' : 'OFFLINE'}
             </span>
           </div>
         </div>
