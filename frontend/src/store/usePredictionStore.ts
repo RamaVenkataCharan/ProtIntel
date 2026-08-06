@@ -37,6 +37,8 @@ const saveHistory = (history: PredictResponse[]) => {
   }
 };
 
+let activePollId = 0;
+
 export const usePredictionStore = create<PredictionStoreState>((set, get) => ({
   history: loadHistory(),
   activePrediction: null,
@@ -49,10 +51,15 @@ export const usePredictionStore = create<PredictionStoreState>((set, get) => ({
   batchError: null,
 
   runPredict: async (req) => {
+    // Increment poll ID to abort any previous polling loop
+    const currentPollId = ++activePollId;
     set({ isPredicting: true, predictionError: null, jobStatus: null });
+
     try {
       const res = await predictSequence(req);
       
+      if (currentPollId !== activePollId) return res as any;
+
       // Check if this is an asynchronous job status response
       if ('job_id' in res) {
         const jobId = res.job_id;
@@ -64,7 +71,13 @@ export const usePredictionStore = create<PredictionStoreState>((set, get) => ({
         
         while (attempts < maxAttempts) {
           await new Promise(resolve => setTimeout(resolve, 500));
+          if (currentPollId !== activePollId) {
+            return res as any; // Aborted by newer request
+          }
+
           const jobState = await fetchJobStatus(jobId);
+          if (currentPollId !== activePollId) return res as any;
+
           set({ jobStatus: jobState.status });
           
           if (jobState.status === 'completed' && jobState.result) {
@@ -105,7 +118,9 @@ export const usePredictionStore = create<PredictionStoreState>((set, get) => ({
         return res;
       }
     } catch (err: any) {
-      set({ predictionError: err?.message || 'Prediction failed', isPredicting: false });
+      if (currentPollId === activePollId) {
+        set({ predictionError: err?.message || 'Prediction failed', isPredicting: false });
+      }
       throw err;
     }
   },

@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useModelStore } from '../store/useModelStore';
 import { useThemeStore } from '../store/useThemeStore';
-import { Activity, Server, AlertTriangle, BarChart3, Database, Layers, Sun, Moon } from 'lucide-react';
+import { Activity, Server, AlertTriangle, BarChart3, Database, Layers, Sun, Moon, Search } from 'lucide-react';
+import { CommandPalette } from './CommandPalette';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -12,12 +13,24 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { isHealthy, modelLoaded, device, checkStatus, error } = useModelStore();
   const { theme, toggleTheme } = useThemeStore();
   const location = useLocation();
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
   useEffect(() => {
     checkStatus();
     // Poll every 30 seconds
     const interval = setInterval(checkStatus, 30000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const navItems = [
@@ -90,6 +103,19 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
         {/* Header Actions & Backend Status */}
         <div className="flex items-center gap-3">
+          {/* Command Palette Trigger Button */}
+          <button
+            onClick={() => setIsCommandPaletteOpen(true)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--bg-raised)] border border-[var(--border-subtle)] hover:border-violet-500 transition-all cursor-pointer text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            title="Open Command Palette (Cmd/Ctrl + K)"
+          >
+            <Search className="h-3.5 w-3.5 text-violet-400" />
+            <span className="font-mono text-[11px]">Command</span>
+            <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[9px] font-mono font-bold bg-black/40 border border-white/10 rounded text-slate-400">
+              ⌘K
+            </kbd>
+          </button>
+
           {/* Light/Dark Theme Toggle Button */}
           <button
             onClick={toggleTheme}
@@ -130,6 +156,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         </div>
       </header>
+
+      {/* Global Command Palette Modal */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+      />
 
       {/* Global Status Warnings */}
       {(!isHealthy || !modelLoaded) && (

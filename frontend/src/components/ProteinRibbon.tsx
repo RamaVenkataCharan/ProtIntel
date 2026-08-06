@@ -25,22 +25,6 @@ interface ProteinRibbonProps {
   onHoverResidue: (index: number | null) => void;
 }
 
-// XAI Heatmap Colormap Generator (Cool Blue -> Amber -> Crimson Red)
-const getHeatmapColor = (importance: number): THREE.Color => {
-  const norm = Math.max(0, Math.min(1, importance));
-  const coolBlue = new THREE.Color('#3B82F6');
-  const warmAmber = new THREE.Color('#F59E0B');
-  const hotCrimson = new THREE.Color('#EF4444');
-  
-  const col = new THREE.Color();
-  if (norm < 0.5) {
-    col.lerpColors(coolBlue, warmAmber, norm * 2);
-  } else {
-    col.lerpColors(warmAmber, hotCrimson, (norm - 0.5) * 2);
-  }
-  return col;
-};
-
 export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
   sequence,
   q3Prediction,
@@ -78,18 +62,43 @@ export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
     }
   }, [resetTrigger, reducedMotion]);
 
-  // Pre-allocated temporaries for instance loop
-  const tempMatrix = new THREE.Matrix4();
-  const tempPosition = new THREE.Vector3();
-  const tempDirection = new THREE.Vector3();
-  const tempRotation = new THREE.Quaternion();
-  const tempScale = new THREE.Vector3();
-  const tempColor = new THREE.Color();
-  const colorNeutral = new THREE.Color(NEUTRAL_COLORS.loadingHex);
-  const colorHoverGlow = new THREE.Color('#00D9C0');
-  const colorSelectGlow = new THREE.Color('#FFB347');
-  const colorLowConf = new THREE.Color('#334155');
-  const zAxis = new THREE.Vector3(0, 0, 1);
+  // Pre-allocated temporaries for instance loop to prevent GC churn on long sequences
+  const tempMatrix = useRef(new THREE.Matrix4()).current;
+  const tempPosition = useRef(new THREE.Vector3()).current;
+  const tempDirection = useRef(new THREE.Vector3()).current;
+  const tempRotation = useRef(new THREE.Quaternion()).current;
+  const tempScale = useRef(new THREE.Vector3()).current;
+  const tempColor = useRef(new THREE.Color()).current;
+  const tempCurP1 = useRef(new THREE.Vector3()).current;
+  const tempCurP2 = useRef(new THREE.Vector3()).current;
+  const tempColorQ3 = useRef(new THREE.Color()).current;
+  const tempColorQ8 = useRef(new THREE.Color()).current;
+  const tempColorStruct = useRef(new THREE.Color()).current;
+  const tempColorXAI = useRef(new THREE.Color()).current;
+
+  // Heatmap gradient color stops
+  const colorHeatBlue = useRef(new THREE.Color('#3B82F6')).current;
+  const colorHeatCyan = useRef(new THREE.Color('#06B6D4')).current;
+  const colorHeatAmber = useRef(new THREE.Color('#F59E0B')).current;
+  const colorHeatRed = useRef(new THREE.Color('#EF4444')).current;
+
+  const colorNeutral = useRef(new THREE.Color(NEUTRAL_COLORS.loadingHex)).current;
+  const colorHoverGlow = useRef(new THREE.Color('#00E5CC')).current;
+  const colorSelectGlow = useRef(new THREE.Color('#F59E0B')).current;
+  const colorLowConf = useRef(new THREE.Color('#475569')).current;
+  const zAxis = useRef(new THREE.Vector3(0, 0, 1)).current;
+
+  // Zero-allocation XAI Heatmap Color Evaluator
+  const getXAIColorInto = (norm: number, target: THREE.Color) => {
+    const clamped = Math.max(0, Math.min(1, norm));
+    if (clamped < 0.33) {
+      target.lerpColors(colorHeatBlue, colorHeatCyan, clamped / 0.33);
+    } else if (clamped < 0.66) {
+      target.lerpColors(colorHeatCyan, colorHeatAmber, (clamped - 0.33) / 0.33);
+    } else {
+      target.lerpColors(colorHeatAmber, colorHeatRed, (clamped - 0.66) / 0.34);
+    }
+  };
 
   useFrame((state, delta) => {
     const mesh = instancedMeshRef.current;
@@ -123,18 +132,26 @@ export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
       pulseIndexRef.current = null;
     }
 
-    // Find max importance for normalization if XAI mode
-    let maxImportance = 1.0;
+    // 3. Dynamic Min-Max normalization for XAI attributions
+    let minImp = 0;
+    let maxImp = 1;
     if (residueImportance && residueImportance.length > 0) {
-      maxImportance = Math.max(...residueImportance.map(v => Math.abs(v))) || 1.0;
+      minImp = Infinity;
+      maxImp = -Infinity;
+      for (let k = 0; k < residueImportance.length; k++) {
+        const val = residueImportance[k];
+        if (val < minImp) minImp = val;
+        if (val > maxImp) maxImp = val;
+      }
     }
+    const impRange = (maxImp - minImp) > 1e-6 ? (maxImp - minImp) : 1.0;
 
     const limit = L - 1;
     for (let i = 0; i < limit; i++) {
       const q3 = q3Prediction[i] || 'C';
       const conf = confidence[i] !== undefined ? confidence[i] : 1.0;
-      const importance = residueImportance?.[i] ?? 0;
-      const normImportance = Math.abs(importance) / maxImportance;
+      const rawImp = residueImportance?.[i] ?? minImp;
+      const normImportance = Math.max(0, Math.min(1, (rawImp - minImp) / impRange));
 
       const staggerDelay = (i / limit) * 0.45;
       let localReveal = 1;
@@ -148,12 +165,12 @@ export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
       const p1_folded = foldedPoints[i];
       const p2_folded = foldedPoints[i + 1];
 
-      const curP1 = new THREE.Vector3().lerpVectors(p1_flat, p1_folded, localReveal);
-      const curP2 = new THREE.Vector3().lerpVectors(p2_flat, p2_folded, localReveal);
+      tempCurP1.lerpVectors(p1_flat, p1_folded, localReveal);
+      tempCurP2.lerpVectors(p2_flat, p2_folded, localReveal);
 
-      tempPosition.addVectors(curP1, curP2).multiplyScalar(0.5);
+      tempPosition.addVectors(tempCurP1, tempCurP2).multiplyScalar(0.5);
 
-      tempDirection.subVectors(curP2, curP1);
+      tempDirection.subVectors(tempCurP2, tempCurP1);
       const curLength = tempDirection.length();
       if (curLength > 0.001) {
         tempDirection.normalize();
@@ -166,14 +183,14 @@ export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
       let baseWidth = 0.4;
       let baseHeight = 0.4;
       if (q3 === 'H') {
-        baseWidth = isMobile ? 0.7 : 0.8;
-        baseHeight = isMobile ? 0.7 : 0.8;
+        baseWidth = isMobile ? 0.75 : 0.85;
+        baseHeight = isMobile ? 0.75 : 0.85;
       } else if (q3 === 'E') {
         baseWidth = isMobile ? 2.2 : 2.6;
-        baseHeight = isMobile ? 0.08 : 0.10;
+        baseHeight = isMobile ? 0.10 : 0.12;
       } else {
-        baseWidth = 0.22;
-        baseHeight = 0.22;
+        baseWidth = 0.25;
+        baseHeight = 0.25;
       }
 
       // Scale multipliers for hover / select / scrubber / measurement
@@ -197,22 +214,23 @@ export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
       const q8Char = q8Prediction ? q8Prediction[i] : null;
       const q8Key = (q8Char && q8Char in Q8_STRUCTURE_COLORS) ? (q8Char as keyof typeof Q8_STRUCTURE_COLORS) : null;
 
-      const colorQ3 = new THREE.Color(STRUCTURE_COLORS[q3Key].hex);
-      const colorQ8 = new THREE.Color(q8Key ? Q8_STRUCTURE_COLORS[q8Key].hex : STRUCTURE_COLORS[q3Key].hex);
+      tempColorQ3.set(STRUCTURE_COLORS[q3Key].hex);
+      tempColorQ8.set(q8Key ? Q8_STRUCTURE_COLORS[q8Key].hex : STRUCTURE_COLORS[q3Key].hex);
 
       // Interpolate between Q3 and Q8 structure colors via colorMorph slider
-      const colorStruct = new THREE.Color().lerpColors(colorQ3, colorQ8, colorMorph);
+      tempColorStruct.lerpColors(tempColorQ3, tempColorQ8, colorMorph);
 
       let targetColor: THREE.Color;
 
       if (viewMode === 'xai') {
-        targetColor = getHeatmapColor(normImportance);
+        getXAIColorInto(normImportance, tempColorXAI);
+        targetColor = tempColorXAI;
       } else if (viewMode === 'q3') {
-        targetColor = colorQ3;
+        targetColor = tempColorQ3;
       } else if (viewMode === 'q8') {
-        targetColor = colorQ8;
+        targetColor = tempColorQ8;
       } else {
-        targetColor = colorStruct;
+        targetColor = tempColorStruct;
       }
 
       tempColor.lerpColors(colorNeutral, targetColor, localReveal);
@@ -220,14 +238,14 @@ export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
       // Confidence-Based Opacity / Desaturation Encoding
       if (conf < 0.65) {
         const desatFactor = (0.65 - conf) * 1.4;
-        tempColor.lerp(colorLowConf, Math.min(0.85, desatFactor));
+        tempColor.lerp(colorLowConf, Math.min(0.80, desatFactor));
         if (!reducedMotion) {
           const pulseIntensity = Math.sin(time * 3 + i * 0.1) * 0.15 + 0.85;
           tempColor.multiplyScalar(pulseIntensity);
         }
       }
 
-      // Priority Highlights: Selection (Amber) > Hover / Scrubber (Teal)
+      // Priority Highlights: Selection (Amber) > Hover / Scrubber (Cyan)
       if (isSel || isMeasured) {
         tempColor.lerp(colorSelectGlow, 0.95);
       } else if (isHov || isScrub) {
@@ -266,10 +284,10 @@ export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
     >
       <cylinderGeometry args={[0.5, 0.5, 1, 8]} />
       <meshStandardMaterial
-        roughness={0.25}
-        metalness={0.55}
-        emissive="#1a0b2e"
-        emissiveIntensity={0.2}
+        roughness={0.32}
+        metalness={0.12}
+        emissive="#1e1b4b"
+        emissiveIntensity={0.25}
         flatShading={false}
       />
     </instancedMesh>

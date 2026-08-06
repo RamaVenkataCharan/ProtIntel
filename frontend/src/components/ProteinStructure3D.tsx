@@ -16,9 +16,11 @@ interface ProteinStructure3DProps {
   hoveredIndex: number | null;
   isPredicting: boolean;
   onHoverResidue?: (idx: number | null) => void;
+  viewMode?: ViewMode3D;
+  onViewModeChange?: (mode: ViewMode3D) => void;
 }
 
-// CameraController with BUG FIX for Camera Fly-Through loop & OrbitControls handover
+// CameraController: Manages smooth 3/4 framing, target focus, reset, and cinematic fly-through
 interface CameraControllerProps {
   targetPosition: THREE.Vector3 | null;
   isCinematicTour: boolean;
@@ -26,6 +28,8 @@ interface CameraControllerProps {
   reducedMotion: boolean;
   isInteracting: React.MutableRefObject<boolean>;
   orbitControlsRef: React.RefObject<any>;
+  defaultCamPosition: THREE.Vector3;
+  resetTrigger: number;
   onEndTour: () => void;
 }
 
@@ -36,9 +40,12 @@ const CameraController: React.FC<CameraControllerProps> = ({
   reducedMotion,
   isInteracting,
   orbitControlsRef,
+  defaultCamPosition,
+  resetTrigger,
   onEndTour,
 }) => {
   const tourProgressRef = useRef(0);
+  const isResettingRef = useRef(false);
 
   // Sync OrbitControls enabled state when tour starts / ends
   useEffect(() => {
@@ -47,22 +54,40 @@ const CameraController: React.FC<CameraControllerProps> = ({
 
     if (isCinematicTour) {
       tourProgressRef.current = 0;
-      controls.enabled = false; // Disable controls while tour drives camera
+      controls.enabled = false;
     } else {
-      controls.enabled = true; // Hand control back to OrbitControls
+      controls.enabled = true;
       controls.update();
     }
   }, [isCinematicTour, orbitControlsRef]);
 
+  // Smoothly lerp to default 3/4 isometric position on resetTrigger or new sequence
+  useEffect(() => {
+    isResettingRef.current = true;
+    const timer = setTimeout(() => {
+      isResettingRef.current = false;
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [resetTrigger, defaultCamPosition]);
+
   useFrame((state, delta) => {
     const controls = orbitControlsRef.current;
 
-    // 1. FIXED ONE-SHOT CINEMATIC TOUR MODE (No stuck looping, clean handover)
+    // 1. Resetting to 3/4 dynamic bounding-sphere framing
+    if (isResettingRef.current && !isInteracting.current && !isCinematicTour) {
+      state.camera.position.lerp(defaultCamPosition, delta * 5);
+      if (controls) {
+        controls.target.lerp(new THREE.Vector3(0, 0, 0), delta * 5);
+        controls.update();
+      }
+      return;
+    }
+
+    // 2. ONE-SHOT CINEMATIC FLY-THROUGH TOUR (Stable along backbone, no coordinate fight)
     if (isCinematicTour && foldedPoints.length > 0 && !reducedMotion && !isInteracting.current) {
-      tourProgressRef.current += delta * 0.15; // Smooth progression from 0.0 to 1.0
+      tourProgressRef.current += delta * 0.12; // Smooth cinematic velocity
 
       if (tourProgressRef.current >= 1.0) {
-        // Tour completed N-terminus to C-terminus path cleanly
         tourProgressRef.current = 1.0;
         if (controls) {
           const finalPt = foldedPoints[foldedPoints.length - 1];
@@ -77,18 +102,18 @@ const CameraController: React.FC<CameraControllerProps> = ({
       const pointIdx = Math.floor(tourProgressRef.current * (foldedPoints.length - 1));
       const pt = foldedPoints[pointIdx] || foldedPoints[0];
 
-      // Position camera offset from backbone point
-      const camPos = new THREE.Vector3(pt.x + 8, pt.y + 6, pt.z + 14);
+      // Smooth camera offset floating slightly above & right of current residue
+      const camPos = new THREE.Vector3(pt.x + 6, pt.y + 4, pt.z + 12);
       state.camera.position.lerp(camPos, delta * 4);
       state.camera.lookAt(pt);
 
       if (controls) {
-        controls.target.copy(pt); // Keep OrbitControls target synced
+        controls.target.copy(pt);
       }
       return;
     }
 
-    // 2. Click-to-Inspect Focus Target
+    // 3. Click-to-Inspect Focus Target
     if (targetPosition && !isInteracting.current) {
       const camPos = new THREE.Vector3(targetPosition.x, targetPosition.y + 4, targetPosition.z + 16);
       state.camera.position.lerp(camPos, delta * 4);
@@ -102,19 +127,32 @@ const CameraController: React.FC<CameraControllerProps> = ({
   return null;
 };
 
-// GroupRig handles slow idle ambient spin
+// GroupRig handles slow idle ambient spin (safely paused when inspecting or during tour/playback)
 interface GroupRigProps {
   children: React.ReactNode;
   reducedMotion: boolean;
   isInteracting: React.MutableRefObject<boolean>;
+  isCinematicTour: boolean;
+  isPlaying: boolean;
+  hasSelection: boolean;
 }
 
-const GroupRig: React.FC<GroupRigProps> = ({ children, reducedMotion, isInteracting }) => {
+const GroupRig: React.FC<GroupRigProps> = ({
+  children,
+  reducedMotion,
+  isInteracting,
+  isCinematicTour,
+  isPlaying,
+  hasSelection,
+}) => {
   const groupRef = useRef<THREE.Group>(null);
   const currentRotation = useRef(0);
 
+  // Pause ambient spin during active user interaction, tour, timeline playback, or residue inspection
+  const shouldSpin = !isInteracting.current && !reducedMotion && !isCinematicTour && !isPlaying && !hasSelection;
+
   useFrame((_, delta) => {
-    if (groupRef.current && !isInteracting.current && !reducedMotion) {
+    if (groupRef.current && shouldSpin) {
       currentRotation.current += delta * 0.04;
       groupRef.current.rotation.y = currentRotation.current;
     }
@@ -132,6 +170,8 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
   hoveredIndex,
   isPredicting,
   onHoverResidue,
+  viewMode: controlledViewMode,
+  onViewModeChange,
 }) => {
   const { theme } = useThemeStore();
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -143,22 +183,29 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
 
   // Interactive 3D States
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode3D>('structure');
+  const [internalViewMode, setInternalViewMode] = useState<ViewMode3D>('structure');
+  const viewMode = controlledViewMode !== undefined ? controlledViewMode : internalViewMode;
+
+  const handleViewModeChange = (mode: ViewMode3D) => {
+    setInternalViewMode(mode);
+    onViewModeChange?.(mode);
+  };
+
   const [colorMorph, setColorMorph] = useState(0); // 0 = Q3, 1 = Q8
   
-  // Feature 5: Scrubber / Playback
+  // Scrubber / Playback
   const [scrubberIndex, setScrubberIndex] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playSpeed, setPlaySpeed] = useState<1 | 2 | 4>(1);
 
-  // Feature 7: Measurement tool
+  // Measurement tool
   const [isMeasuringMode, setIsMeasuringMode] = useState(false);
   const [measurePoints, setMeasurePoints] = useState<[number, number] | null>(null);
 
-  // Feature 8: Cinematic tour
+  // Cinematic tour
   const [isCinematicTour, setIsCinematicTour] = useState(false);
 
-  // Feature 11: Shortcuts Modal
+  // Shortcuts Modal
   const [showShortcuts, setShowShortcuts] = useState(false);
 
   // Detect reduced motion & mobile
@@ -177,7 +224,7 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
     return () => window.removeEventListener('resize', checkDevice);
   }, []);
 
-  // Keyboard Shortcuts Listener (Feature 11)
+  // Keyboard Shortcuts Listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -209,8 +256,46 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
     return generateProteinPath(sequence, q3Prediction);
   }, [sequence, q3Prediction]);
 
+  // Dynamic Bounding Sphere & Optimal 3/4 Isometric Perspective Camera Calculation (BUG 4 Fix)
+  const { boundingRadius, defaultCamDistance, defaultCamPosition } = useMemo(() => {
+    if (!pathData?.foldedPoints || pathData.foldedPoints.length === 0) {
+      const defaultDist = 25;
+      const dir = new THREE.Vector3(0.42, 0.32, 0.85).normalize();
+      return {
+        boundingRadius: 8,
+        defaultCamDistance: defaultDist,
+        defaultCamPosition: dir.multiplyScalar(defaultDist),
+      };
+    }
+
+    let maxDistSq = 0;
+    for (const p of pathData.foldedPoints) {
+      const dSq = p.x * p.x + p.y * p.y + p.z * p.z;
+      if (dSq > maxDistSq) maxDistSq = dSq;
+    }
+    const radius = Math.max(6, Math.sqrt(maxDistSq));
+    
+    // Vertical FOV = 40 deg; frame bounding sphere with 35% comfortable padding
+    const fovRad = (40 * Math.PI) / 180;
+    const requiredDist = (radius * 1.35) / Math.sin(fovRad / 2);
+    const dist = Math.max(18, Math.min(130, requiredDist));
+    
+    // 3/4 isometric perspective direction vector (elevated 3/4 view)
+    const dir = new THREE.Vector3(0.42, 0.32, 0.85).normalize();
+    const pos = dir.multiplyScalar(dist);
+
+    return {
+      boundingRadius: radius,
+      defaultCamDistance: dist,
+      defaultCamPosition: pos,
+    };
+  }, [pathData]);
+
   // Handle residue click inspect
   const handleSelectResidue = (idx: number | null) => {
+    if (isCinematicTour) {
+      setIsCinematicTour(false);
+    }
     if (isMeasuringMode) {
       if (idx === null) return;
       if (!measurePoints) {
@@ -229,7 +314,7 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
     if (onHoverResidue) onHoverResidue(idx);
   };
 
-  // Feature 5: High-Res Canvas PNG Snapshot Export
+  // High-Res Canvas PNG Snapshot Export
   const handleTakeSnapshot = () => {
     const canvas = canvasContainerRef.current?.querySelector('canvas');
     if (!canvas) return;
@@ -302,36 +387,38 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
   }, [selectedIndex, hoveredIndex, scrubberIndex, sequence, q3Prediction, q8Prediction, confidence, residueImportance]);
 
   return (
-    <div ref={canvasContainerRef} className="w-full h-[450px] bg-[radial-gradient(circle_at_30%_20%,#1a0b2e_0%,#0a0e17_60%,#050508_100%)] border border-[var(--border-subtle)] rounded-3xl relative overflow-hidden flex flex-col group/canvas">
-      
+    <div
+      ref={canvasContainerRef}
+      className="w-full h-[460px] bg-[radial-gradient(circle_at_50%_30%,#161b2e_0%,#090d18_70%,#04060b_100%)] border border-[var(--border-subtle)] rounded-3xl relative overflow-hidden flex flex-col group/canvas shadow-2xl"
+    >
       {/* ── TOP TOOLBAR ─────────────────────────────────────────────── */}
       <div className="absolute top-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-auto">
-        <div className="flex flex-wrap items-center gap-1.5 bg-black/70 backdrop-blur-md p-1.5 rounded-2xl border border-white/[0.08]">
+        <div className="flex flex-wrap items-center gap-1.5 bg-black/75 backdrop-blur-md p-1.5 rounded-2xl border border-white/[0.1] shadow-lg">
           <button
             onClick={triggerReset}
             disabled={!hasData || isPredicting}
             className="px-2.5 py-1 rounded-xl text-xs font-bold text-slate-300 hover:text-white hover:bg-white/10 transition-all flex items-center gap-1 cursor-pointer disabled:opacity-30"
-            title="Reset focus (R)"
+            title="Reset to 3/4 perspective (R)"
           >
             <RotateCcw className="h-3.5 w-3.5" />
-            <span>Reset</span>
+            <span>Reset View</span>
           </button>
 
           {/* View Mode Switcher */}
           <div className="h-4 w-[1px] bg-white/10 mx-1" />
           <button
-            onClick={() => setViewMode('structure')}
+            onClick={() => handleViewModeChange('structure')}
             className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              viewMode === 'structure' ? 'bg-violet-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'
+              viewMode === 'structure' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             Structure Mode
           </button>
           <button
-            onClick={() => setViewMode('xai')}
+            onClick={() => handleViewModeChange('xai')}
             disabled={!residueImportance}
             className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              viewMode === 'xai' ? 'bg-amber-500 text-black shadow-lg' : 'text-slate-400 hover:text-slate-200 disabled:opacity-30'
+              viewMode === 'xai' ? 'bg-amber-500 text-black shadow-md' : 'text-slate-400 hover:text-slate-200 disabled:opacity-30'
             }`}
           >
             XAI Heatmap
@@ -354,7 +441,7 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
         </div>
 
         {/* Action Tools: Snapshot, Measurement, Tour, Keyboard Guide */}
-        <div className="flex items-center gap-1.5 bg-black/70 backdrop-blur-md p-1.5 rounded-2xl border border-white/[0.08]">
+        <div className="flex items-center gap-1.5 bg-black/75 backdrop-blur-md p-1.5 rounded-2xl border border-white/[0.1] shadow-lg">
           <button
             onClick={handleTakeSnapshot}
             disabled={!hasData || isPredicting}
@@ -371,7 +458,7 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
               if (!isMeasuringMode) setMeasurePoints(null);
             }}
             className={`px-2 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-              isMeasuringMode ? 'bg-amber-500 text-black' : 'text-slate-300 hover:text-white hover:bg-white/10'
+              isMeasuringMode ? 'bg-amber-500 text-black shadow-md' : 'text-slate-300 hover:text-white hover:bg-white/10'
             }`}
             title="Measure schematic distance (M)"
           >
@@ -385,7 +472,7 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
               if (!isCinematicTour) setSelectedIndex(null);
             }}
             className={`px-2 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-              isCinematicTour ? 'bg-violet-500 text-white' : 'text-slate-300 hover:text-white hover:bg-white/10'
+              isCinematicTour ? 'bg-violet-500 text-white shadow-md' : 'text-slate-300 hover:text-white hover:bg-white/10'
             }`}
             title="Cinematic fly-through camera (T)"
           >
@@ -403,16 +490,16 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
         </div>
       </div>
 
-      {/* ── KEYBOARD SHORTCUTS MODAL (Feature 11) ────────────────────── */}
+      {/* ── KEYBOARD SHORTCUTS MODAL ─────────────────────────────────── */}
       {showShortcuts && (
         <div className="absolute inset-0 z-30 bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-fade-in">
-          <div className="glass-instrument-card p-6 rounded-3xl max-w-sm w-full border border-violet-500/30">
+          <div className="glass-instrument-card p-6 rounded-3xl max-w-sm w-full border border-violet-500/30 shadow-2xl">
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-white/10">
               <h4 className="text-sm font-bold text-slate-100 flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)' }}>
                 <Keyboard className="h-4 w-4 text-violet-400" />
                 Keyboard Shortcuts
               </h4>
-              <button onClick={() => setShowShortcuts(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setShowShortcuts(false)} className="text-slate-400 hover:text-white cursor-pointer">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -428,7 +515,7 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
         </div>
       )}
 
-      {/* ── FLOATING HUD RESIDUE INSPECT CARD (Feature 1) ─────────── */}
+      {/* ── FLOATING HUD RESIDUE INSPECT CARD ───────────────────────── */}
       {activeResidueInfo && (
         <div className="absolute top-16 left-4 z-20 glass-instrument-card p-4 rounded-2xl max-w-xs animate-spring-up border border-teal-400/30 shadow-2xl">
           <div className="flex items-center justify-between mb-2 pb-2 border-b border-white/10">
@@ -473,12 +560,12 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
         </div>
       )}
 
-      {/* ── MEASUREMENT HUD TAG (Feature 7 Honesty Disclaimer) ──────── */}
+      {/* ── MEASUREMENT HUD TAG ─────────────────────────────────────── */}
       {measurePoints && measurementDistance !== null && (
-        <div className="absolute top-16 right-4 z-20 glass-instrument-card p-3 rounded-2xl animate-spring-up border border-amber-400/40">
+        <div className="absolute top-16 right-4 z-20 glass-instrument-card p-3 rounded-2xl animate-spring-up border border-amber-400/40 shadow-2xl">
           <div className="flex items-center justify-between gap-2 mb-1">
             <span className="text-[10px] font-mono font-bold text-amber-400">SCHEMATIC_MEASUREMENT</span>
-            <button onClick={() => setMeasurePoints(null)} className="text-slate-400 hover:text-white">
+            <button onClick={() => setMeasurePoints(null)} className="text-slate-400 hover:text-white cursor-pointer">
               <X className="h-3.5 w-3.5" />
             </button>
           </div>
@@ -496,24 +583,36 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
         <Canvas
           shadows
           gl={{ antialias: !isMobile, powerPreference: 'high-performance', preserveDrawingBuffer: true }}
-          camera={{ fov: 40, near: 0.1, far: 100, position: [0, 0, 25] }}
+          camera={{
+            fov: 40,
+            near: 0.1,
+            far: 300,
+            position: [defaultCamPosition.x, defaultCamPosition.y, defaultCamPosition.z],
+          }}
         >
-          <color attach="background" args={[theme === 'dark' ? '#0a0e17' : '#f1f5f9']} />
-          <fog attach="fog" args={[theme === 'dark' ? '#0a0e17' : '#f1f5f9', 15, 45]} />
+          <color attach="background" args={[theme === 'dark' ? '#070a12' : '#f1f5f9']} />
+          <fog attach="fog" args={[theme === 'dark' ? '#070a12' : '#f1f5f9', 60, 250]} />
 
-          {/* 3-Point Scientific Lighting Rig */}
-          <ambientLight intensity={0.5} />
-          <directionalLight position={[12, 20, 15]} intensity={1.4} castShadow />
-          <pointLight position={[-12, -10, -10]} intensity={0.6} color="#00D9C0" />
-          <directionalLight position={[0, 5, -20]} intensity={1.8} color="#7B2FF7" />
+          {/* Studio 4-Point Scientific Lighting Rig */}
+          <ambientLight intensity={0.9} />
+          <directionalLight
+            position={[20, 30, 25]}
+            intensity={1.8}
+            castShadow
+            shadow-mapSize-width={1024}
+            shadow-mapSize-height={1024}
+          />
+          <directionalLight position={[-20, 15, 20]} intensity={0.9} color="#E0F2FE" />
+          <directionalLight position={[0, -12, -30]} intensity={2.4} color="#C4B5FD" />
+          <pointLight position={[0, -20, 0]} intensity={0.8} color="#00E5CC" />
 
-          {/* Ground Contact Shadow Disc */}
-          <mesh position={[0, -4.5, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-            <circleGeometry args={[18, 32]} />
-            <meshBasicMaterial color="#050811" transparent opacity={0.6} />
+          {/* Dynamic Ground Contact Shadow Disc */}
+          <mesh position={[0, -boundingRadius - 2, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+            <circleGeometry args={[boundingRadius * 2.2, 32]} />
+            <meshBasicMaterial color="#020408" transparent opacity={0.55} />
           </mesh>
 
-          {/* Fixed Camera Controller with OrbitControls Handover */}
+          {/* Dynamic Camera Controller with Smooth Handover */}
           <CameraController
             targetPosition={selectedTargetPosition}
             isCinematicTour={isCinematicTour}
@@ -521,6 +620,8 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
             reducedMotion={reducedMotion}
             isInteracting={isInteracting}
             orbitControlsRef={orbitControlsRef}
+            defaultCamPosition={defaultCamPosition}
+            resetTrigger={resetTrigger}
             onEndTour={() => setIsCinematicTour(false)}
           />
 
@@ -528,8 +629,8 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
             ref={orbitControlsRef}
             enableDamping
             dampingFactor={0.05}
-            maxDistance={80}
-            minDistance={10}
+            maxDistance={defaultCamDistance * 3.2}
+            minDistance={Math.max(4, defaultCamDistance * 0.15)}
             onStart={() => {
               isInteracting.current = true;
               if (isCinematicTour) setIsCinematicTour(false);
@@ -539,7 +640,13 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
             }}
           />
 
-          <GroupRig reducedMotion={reducedMotion} isInteracting={isInteracting}>
+          <GroupRig
+            reducedMotion={reducedMotion}
+            isInteracting={isInteracting}
+            isCinematicTour={isCinematicTour}
+            isPlaying={isPlaying}
+            hasSelection={selectedIndex !== null}
+          >
             {hasData && (
               <ProteinRibbon
                 sequence={sequence!}
@@ -564,9 +671,9 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
         </Canvas>
       </div>
 
-      {/* ── TIMELINE SCRUBBER & PLAYBACK CONTROLS (Feature 5) ──────── */}
+      {/* ── TIMELINE SCRUBBER & PLAYBACK CONTROLS ───────────────────── */}
       {hasData && (
-        <div className="px-4 py-2.5 bg-black/80 backdrop-blur-md border-t border-white/10 flex items-center justify-between gap-4 z-20 select-none">
+        <div className="px-4 py-2.5 bg-black/85 backdrop-blur-md border-t border-white/10 flex items-center justify-between gap-4 z-20 select-none shadow-lg">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsPlaying(!isPlaying)}

@@ -1,20 +1,20 @@
 import React, { useState, lazy, Suspense, useRef, useCallback, useMemo } from 'react';
 import { usePredictionStore } from '../store/usePredictionStore';
 import { useModelStore } from '../store/useModelStore';
+import { StatisticalBreakdownPanels } from '../components/StatisticalBreakdownPanels';
 
 const ProteinStructure3D = lazy(() => import('../components/ProteinStructure3D').then(m => ({ default: m.ProteinStructure3D })));
 
-import { STRUCTURE_COLORS, Q8_STRUCTURE_COLORS } from '../utils/colors';
+import { STRUCTURE_COLORS, Q8_STRUCTURE_COLORS, getXAIColorHex } from '../utils/colors';
 import { Play, AlertCircle, Sparkles, Cpu, Download, Search, FileSpreadsheet } from 'lucide-react';
 
 const MINORITY_Q8 = new Set(['I', 'B', 'S']);
-const Q3_HEX: Record<string, string> = { H: '#7B2FF7', E: '#00D9C0', C: '#64748B' };
 
 // =============================================================================
 // PHYSICOCHEMICAL PROFILE CALCULATOR (Feature 8)
 // =============================================================================
 const computePhysicochemicalProfile = (seq: string) => {
-  if (!seq) return { mw: 0, pi: 7.0, netCharge: 0, hydrophobicPct: 0 };
+  if (!seq) return { mw: 0, pI: 7.0, netCharge: 0, hydrophobicPct: 0 };
   const len = seq.length;
   
   // Approximate residue masses (Da)
@@ -84,6 +84,21 @@ const StackedSequenceStrip: React.FC<StackedStripProps> = ({
     return matches;
   }, [sequence, searchPattern]);
 
+  const { minImp, impRange } = useMemo(() => {
+    if (!residueImportance || residueImportance.length === 0) {
+      return { minImp: 0, impRange: 1 };
+    }
+    let min = Infinity;
+    let max = -Infinity;
+    for (let i = 0; i < residueImportance.length; i++) {
+      const val = residueImportance[i];
+      if (val < min) min = val;
+      if (val > max) max = val;
+    }
+    const range = (max - min) > 1e-6 ? (max - min) : 1.0;
+    return { minImp: min, impRange: range };
+  }, [residueImportance]);
+
   return (
     <div className="flex flex-col gap-0 animate-spring-up">
       <div className="flex items-center justify-between mb-2.5">
@@ -118,13 +133,14 @@ const StackedSequenceStrip: React.FC<StackedStripProps> = ({
           {chars.map((aa, idx) => {
             const q3 = q3Prediction[idx] || 'C';
             const conf = confidence[idx] ?? 1;
-            const importance = residueImportance?.[idx] ?? 0;
             const isHov = hoveredIndex === idx;
             const isMatch = matchedIndices.has(idx);
 
+            const rawImp = residueImportance?.[idx] ?? minImp;
+            const normImp = Math.max(0, Math.min(1, (rawImp - minImp) / impRange));
             const bgColor = activeTab === 'xai'
-              ? `rgba(0, 217, 192, ${0.08 + importance * 0.5})`
-              : (Q3_HEX[q3] || '#64748B');
+              ? getXAIColorHex(normImp)
+              : (STRUCTURE_COLORS[q3 as keyof typeof STRUCTURE_COLORS]?.hex || '#94A3B8');
 
             return (
               <div
@@ -147,7 +163,7 @@ const StackedSequenceStrip: React.FC<StackedStripProps> = ({
           })}
         </div>
 
-        <div className="relative h-[6px] min-w-max my-[2px]" style={{ width: len * 26 + (len - 1) * 2 }}>
+        <div className="relative h-[6px] min-w-max my-[2px]" style={{ width: Math.max(0, len * 26 + (len - 1) * 2) }}>
           <div className="absolute inset-0 rounded-none" style={{ background: 'linear-gradient(90deg, rgba(123,47,247,0.3), rgba(0,217,192,0.3), rgba(255,179,71,0.3))' }} />
           {hoveredIndex !== null && (
             <div
@@ -232,7 +248,7 @@ export const Predict: React.FC = () => {
   const [returnXai, setReturnXai] = useState(false);
   const [xaiMethod, setXaiMethod] = useState<'ig' | 'shap' | 'rollout'>('ig');
   const [validationError, setValidationError] = useState<string | null>(null);
-  const activeTab = 'overview';
+  const [stripViewMode, setStripViewMode] = useState<'structure' | 'xai'>('structure');
   const [searchPattern, setSearchPattern] = useState('');
 
   const [hoveredResidue, setHoveredResidue] = useState<{
@@ -278,7 +294,22 @@ export const Predict: React.FC = () => {
   // Feature 10: Multi-Format Prediction Exporter (JSON / CSV)
   const exportPredictionCSV = () => {
     if (!activePrediction) return;
-    let csv = 'Index,Residue,Q3_Pred,Q8_Pred,Confidence,XAI_Importance\n';
+    const len = activePrediction.sequence.length;
+
+    // Q3 counts
+    const q3Counts: Record<string, number> = { H: 0, E: 0, C: 0 };
+    activePrediction.q3_prediction.forEach(c => { if (c in q3Counts) q3Counts[c]++; });
+
+    // Q8 counts
+    const q8Counts: Record<string, number> = { H: 0, G: 0, I: 0, E: 0, B: 0, T: 0, S: 0, C: 0 };
+    activePrediction.q8_prediction.forEach(c => { if (c in q8Counts) q8Counts[c]++; });
+
+    let csv = `# ProtIntel Prediction Report - ${activePrediction.protein_id}\n`;
+    csv += `# Length: ${len} residues\n`;
+    csv += `# Q3 Summary: Helix(H)=${q3Counts.H} (${(q3Counts.H/len*100).toFixed(1)}%), Sheet(E)=${q3Counts.E} (${(q3Counts.E/len*100).toFixed(1)}%), Coil(C)=${q3Counts.C} (${(q3Counts.C/len*100).toFixed(1)}%)\n`;
+    csv += `# Q8 Summary: H=${q8Counts.H}, G=${q8Counts.G}, I=${q8Counts.I}, E=${q8Counts.E}, B=${q8Counts.B}, T=${q8Counts.T}, S=${q8Counts.S}, C=${q8Counts.C}\n\n`;
+
+    csv += 'Index,Residue,Q3_Pred,Q8_Pred,Confidence,XAI_Importance\n';
     activePrediction.sequence.split('').forEach((aa, i) => {
       const q3 = activePrediction.q3_prediction[i];
       const q8 = activePrediction.q8_prediction[i];
@@ -297,7 +328,32 @@ export const Predict: React.FC = () => {
 
   const exportPredictionJSON = () => {
     if (!activePrediction) return;
-    const blob = new Blob([JSON.stringify(activePrediction, null, 2)], { type: 'application/json' });
+    const len = activePrediction.sequence.length;
+    const q3Counts: Record<string, number> = { H: 0, E: 0, C: 0 };
+    activePrediction.q3_prediction.forEach(c => { if (c in q3Counts) q3Counts[c]++; });
+
+    const q8Counts: Record<string, number> = { H: 0, G: 0, I: 0, E: 0, B: 0, T: 0, S: 0, C: 0 };
+    activePrediction.q8_prediction.forEach(c => { if (c in q8Counts) q8Counts[c]++; });
+
+    const payload = {
+      ...activePrediction,
+      statistical_breakdown: {
+        total_length: len,
+        q3_breakdown: {
+          helix_H: { count: q3Counts.H, percentage: parseFloat((q3Counts.H / len * 100).toFixed(1)) },
+          sheet_E: { count: q3Counts.E, percentage: parseFloat((q3Counts.E / len * 100).toFixed(1)) },
+          coil_C: { count: q3Counts.C, percentage: parseFloat((q3Counts.C / len * 100).toFixed(1)) },
+        },
+        q8_breakdown: Object.fromEntries(
+          Object.entries(q8Counts).map(([k, count]) => [
+            k,
+            { count, percentage: parseFloat((count / len * 100).toFixed(1)) }
+          ])
+        )
+      }
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -511,20 +567,54 @@ export const Predict: React.FC = () => {
                   hoveredIndex={hoveredResidue?.index ?? null}
                   isPredicting={isPredicting}
                   onHoverResidue={setHoveredResidueByIndex}
+                  viewMode={stripViewMode as any}
+                  onViewModeChange={(m) => setStripViewMode(m as any)}
                 />
               </Suspense>
 
               {/* STACKED Q3 / Q8 SEQUENCE STRIPS */}
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-xs font-bold text-[var(--text-primary)] font-mono uppercase tracking-wider">
+                  Interactive Sequence Strip
+                </span>
+                <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/10 text-[10px] font-mono">
+                  <button
+                    onClick={() => setStripViewMode('structure')}
+                    className={`px-2.5 py-0.5 rounded-lg font-bold transition-all cursor-pointer ${
+                      stripViewMode === 'structure' ? 'bg-violet-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Structure Colors
+                  </button>
+                  <button
+                    onClick={() => setStripViewMode('xai')}
+                    disabled={!activePrediction.residue_importance}
+                    className={`px-2.5 py-0.5 rounded-lg font-bold transition-all cursor-pointer ${
+                      stripViewMode === 'xai' ? 'bg-teal-500 text-black shadow' : 'text-slate-400 hover:text-slate-200 disabled:opacity-30'
+                    }`}
+                  >
+                    XAI Attributions
+                  </button>
+                </div>
+              </div>
+
               <StackedSequenceStrip
                 sequence={activePrediction.sequence}
                 q3Prediction={activePrediction.q3_prediction}
                 q8Prediction={activePrediction.q8_prediction}
                 confidence={activePrediction.confidence}
                 residueImportance={activePrediction.residue_importance}
-                activeTab={activeTab}
+                activeTab={stripViewMode}
                 hoveredIndex={hoveredResidue?.index ?? null}
                 searchPattern={searchPattern}
                 onHover={setHoveredResidueByIndex}
+              />
+
+              {/* PART 2: Q3 AND Q8 STATISTICAL BREAKDOWN PANELS */}
+              <StatisticalBreakdownPanels
+                q3Prediction={activePrediction.q3_prediction}
+                q8Prediction={activePrediction.q8_prediction}
+                confidence={activePrediction.confidence}
               />
 
               {/* Feature 3: Per-Residue Probability Distribution Inspector */}
@@ -545,20 +635,37 @@ export const Predict: React.FC = () => {
                     <div>
                       <span className="text-[var(--text-muted)] font-bold block mb-1">Q3 PROBABILITIES</span>
                       <div className="flex gap-2">
-                        {['H', 'E', 'C'].map((cls, i) => (
-                          <div key={cls} className="flex flex-col items-center">
-                            <span className="text-slate-400 text-[8px] font-bold">{cls}</span>
-                            <div className="w-3 h-8 bg-black/40 rounded overflow-hidden flex flex-col-reverse">
-                              <div className="w-full bg-teal-400" style={{ height: `${hoveredResidue.q3_prob[i] * 100}%` }} />
+                        {['H', 'E', 'C'].map((cls, i) => {
+                          const probVal = (hoveredResidue.q3_prob?.[i] ?? 0) * 100;
+                          return (
+                            <div key={cls} className="flex flex-col items-center">
+                              <span className="text-slate-400 text-[8px] font-bold">{cls}</span>
+                              <div className="w-3 h-8 bg-black/40 rounded overflow-hidden flex flex-col-reverse">
+                                <div className="w-full bg-teal-400" style={{ height: `${probVal}%` }} />
+                              </div>
+                              <span className="text-[8px] text-teal-300 font-bold mt-0.5">{probVal.toFixed(0)}%</span>
                             </div>
-                            <span className="text-[8px] text-teal-300 font-bold mt-0.5">{(hoveredResidue.q3_prob[i] * 100).toFixed(0)}%</span>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
                 </div>
               )}
+            </section>
+          ) : predictionError ? (
+            <section className="surface-tier-2 p-8 flex flex-col items-center justify-center text-center gap-4 min-h-[400px]">
+              <div className="p-4 rounded-full bg-rose-500/10 border border-rose-500/30">
+                <AlertCircle className="h-10 w-10 text-rose-400" />
+              </div>
+              <div>
+                <h4 className="text-base font-bold text-[var(--text-primary)] font-mono">
+                  Prediction Job Failed
+                </h4>
+                <p className="text-xs text-rose-300 font-mono mt-1 max-w-md">
+                  {predictionError}
+                </p>
+              </div>
             </section>
           ) : null}
         </div>
