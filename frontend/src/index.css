@@ -1,29 +1,159 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
-/* Custom styles for protein visualization */
+/* ============================================================
+   AURORA DESIGN SYSTEM - ProtIntel
+   Font stack: Space Grotesk (headings) * Inter (body)
+   ============================================================ */
+
+:root {
+  /* Color tokens */
+  --aurora-violet:     #7B2FF7;
+  --aurora-violet-mid: #9B59F5;
+  --aurora-violet-dim: rgba(123, 47, 247, 0.15);
+  --aurora-teal:       #00D9C0;
+  --aurora-teal-dim:   rgba(0, 217, 192, 0.12);
+  --bg-deep:           #0A0E17;
+  --bg-surface:        #0f172a;
+  --bg-raised:         #141c2e;
+  --border-subtle:     rgba(255, 255, 255, 0.06);
+  --border-muted:      rgba(255, 255, 255, 0.10);
+  --text-primary:      #f1f5f9;
+  --text-secondary:    #94a3b8;
+  --text-muted:        #475569;
+  --error-red:         #FF4D6D;
+  --error-dim:         rgba(255, 77, 109, 0.12);
+  --warn-amber:        #FFB347;
+
+  /* Typography */
+  --font-heading: 'Space Grotesk', system-ui, sans-serif;
+  --font-body:    'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono:    'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+
+  /* Shadows */
+  --shadow-violet: 0 0 0 1px rgba(123, 47, 247, 0.3), 0 4px 24px rgba(123, 47, 247, 0.15);
+  --shadow-teal:   0 0 0 1px rgba(0, 217, 192, 0.25), 0 4px 20px rgba(0, 217, 192, 0.10);
+  --shadow-card:   0 1px 2px rgba(0,0,0,0.4), 0 4px 16px rgba(0,0,0,0.3);
+  --shadow-glass:  inset 0 1px 0 rgba(255,255,255,0.05), 0 4px 24px rgba(0,0,0,0.4);
+}
+
+/* BASE */
 @layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
   body {
-    background-color: #0b0f19;
-    color: #f3f4f6;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.6;
+    letter-spacing: -0.01em;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
   }
 }
 
-/* Custom scrollbars */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* KEYFRAMES */
+@keyframes residue-pulse {
+  0%, 100% { opacity: 0.25; transform: scaleY(0.85); }
+  50%       { opacity: 1;    transform: scaleY(1); }
 }
 
-::-webkit-scrollbar-track {
-  background: #0f172a;
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-::-webkit-scrollbar-thumb {
-  background: #334155;
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+@keyframes aurora-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(123,47,247,0.2), 0 0 60px rgba(123,47,247,0.05); }
+  50%       { box-shadow: 0 0 30px rgba(0,217,192,0.2), 0 0 80px rgba(0,217,192,0.08); }
+}
+
+@keyframes strand-reveal {
+  from { opacity: 0; transform: scaleX(0); transform-origin: left center; }
+  to   { opacity: 1; transform: scaleX(1); transform-origin: left center; }
+}
+
+/* UTILITY ANIMATION CLASSES */
+.animate-slide-up  { animation: slide-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-fade-in   { animation: fade-in  0.25s ease both; }
+.animate-aurora-glow { animation: aurora-glow 4s ease-in-out infinite; }
+.animate-shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.03) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite;
+}
+
+/* RESIDUE STRIP */
+.residue-strip {
+  display: flex;
+  flex-direction: row;
+  gap: 2px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(123, 47, 247, 0.4) transparent;
+}
+
+.residue-strip::-webkit-scrollbar { height: 3px; }
+.residue-strip::-webkit-scrollbar-track { background: transparent; }
+.residue-strip::-webkit-scrollbar-thumb {
+  background: rgba(123, 47, 247, 0.4);
+  border-radius: 99px;
+}
+
+.residue-block {
+  flex: 0 0 auto;
+  width: 22px;
   border-radius: 4px;
+  cursor: pointer;
+  transition: transform 0.1s ease, filter 0.15s ease;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+.residue-block:hover,
+.residue-block.hovered {
+  transform: scaleY(1.18);
+  filter: brightness(1.25);
+  z-index: 2;
 }
+
+/* GLASSMORPHISM */
+.glass-card {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid var(--border-subtle);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-glass);
+}
+
+/* SCROLLBARS (global) */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(123, 47, 247, 0.35);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(123, 47, 247, 0.6); }
+
+/* SELECTION / FOCUS */
+::selection { background: rgba(123, 47, 247, 0.3); color: #fff; }
+:focus-visible { outline: 2px solid var(--aurora-violet); outline-offset: 2px; border-radius: 4px; }

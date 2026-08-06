@@ -465,7 +465,7 @@ class ProteinDataModule:
                 "nonstandard_policy": config.preprocessing.nonstandard_policy,
                 "sliding_window_overlap": config.preprocessing.sliding_window_overlap,
             },
-            "splits": {"train": "cullpdb", "val": "cb513", "test": "cb513"},
+            "splits": {"train": "cullpdb", "val": "rs126", "test": "cb513"},
             "sliding_window_enabled": getattr(config, "sliding_window_enabled", False),
             "sliding_window_size": getattr(config, "sliding_window_size", 512),
             "sliding_window_stride": getattr(config, "sliding_window_stride", 64),
@@ -489,7 +489,7 @@ class ProteinDataModule:
         instance.splits = raw["splits"]
         instance.cullpdb_file = "cullpdb+profile_6133_filtered.npy.gz"
         instance.cb513_file = "cb513+profile_split1.npy.gz"
-        instance.rs126_file = "cb513+profile_split1.npy.gz"
+        instance.rs126_file = "rs126+profile_split1.npy.gz"
         instance.use_embedding_cache = True
         instance.train_dataset = None
         instance.val_dataset = None

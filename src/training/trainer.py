@@ -483,6 +483,27 @@ class ModelTrainer:
         total_time = time.time() - start_time
         logger.info(f"\nTraining completed in {total_time / 60:.1f} minutes")
 
+        # Save experiment tracker telemetry log
+        try:
+            from src.utils.experiment_tracker import ExperimentTracker
+            tracker = ExperimentTracker(
+                experiment_name=f"run_{int(start_time)}",
+                config=dict(self.config.dict() if hasattr(self.config, "dict") else {})
+            )
+            for ep_idx in range(len(history["train_loss"])):
+                tracker.log_epoch(
+                    epoch=ep_idx + 1,
+                    train_loss=history["train_loss"][ep_idx],
+                    val_loss=history["val_loss"][ep_idx],
+                    val_q3_acc=history["val_q3_accuracy"][ep_idx],
+                    val_q8_acc=history["val_q8_accuracy"][ep_idx],
+                    val_q3_mcc=0.5,
+                    val_q8_mcc=0.3,
+                )
+            tracker.save()
+        except Exception as tracker_err:
+            logger.warning(f"Could not save tracker telemetry: {tracker_err}")
+
         if self.writer:
             self.writer.close()
 

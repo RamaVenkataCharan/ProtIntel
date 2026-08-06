@@ -26,22 +26,31 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] text-gray-100 flex flex-col font-sans">
+    <div className="min-h-screen text-gray-100 flex flex-col" style={{ backgroundColor: 'var(--bg-deep)', fontFamily: 'var(--font-body)' }}>
       {/* Premium Glassmorphic Navbar */}
-      <header className="sticky top-0 z-50 backdrop-blur-md bg-[#0f172a]/60 border-b border-slate-800/80 px-6 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#0a0e17]/80 border-b border-white/[0.06] px-6 py-3.5 flex items-center justify-between" style={{ boxShadow: '0 1px 0 rgba(255,255,255,0.04)' }}>
         <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-tr from-purple-600 to-indigo-600 p-2 rounded-xl shadow-lg shadow-purple-500/20">
-            <Layers className="h-6 w-6 text-white" />
+          <div
+            className="p-2 rounded-xl"
+            style={{
+              background: 'linear-gradient(135deg, #7B2FF7 0%, #00D9C0 100%)',
+              boxShadow: '0 0 16px rgba(123,47,247,0.4), 0 0 32px rgba(0,217,192,0.15)',
+            }}
+          >
+            <Layers className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-400">
+            <h1
+              className="text-lg font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-teal-300"
+              style={{ fontFamily: 'var(--font-heading)' }}
+            >
               ProtIntel
             </h1>
-            <p className="text-xs text-slate-400 font-medium">Explainable Protein Analysis</p>
+            <p className="text-[11px] text-slate-500 font-medium leading-none mt-0.5">Explainable Protein Analysis</p>
           </div>
         </div>
 
-        <nav className="flex items-center gap-1">
+        <nav className="flex items-center gap-0.5">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
@@ -49,14 +58,25 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 ${
+                className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${
                   isActive
-                    ? 'bg-purple-600/15 text-purple-400 border border-purple-500/20'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
+                    ? 'text-white'
+                    : 'text-slate-400 hover:text-slate-100 hover:bg-white/[0.04]'
                 }`}
+                style={isActive ? { fontFamily: 'var(--font-heading)' } : { fontFamily: 'var(--font-heading)' }}
               >
-                <Icon className="h-4 w-4" />
-                {item.label}
+                {isActive && (
+                  <span
+                    className="absolute inset-0 rounded-xl"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(123,47,247,0.18) 0%, rgba(0,217,192,0.08) 100%)',
+                      border: '1px solid rgba(123,47,247,0.3)',
+                      boxShadow: '0 0 12px rgba(123,47,247,0.1)',
+                    }}
+                  />
+                )}
+                <Icon className="relative h-4 w-4" />
+                <span className="relative">{item.label}</span>
               </Link>
             );
           })}
@@ -111,8 +131,13 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         {children}
       </main>
 
-      <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-500 font-medium">
-        &copy; {new Date().getFullYear()} ProtIntel Protein Intelligence. All rights reserved.
+      <footer className="border-t border-white/[0.04] py-5 text-center flex flex-col items-center gap-1">
+        <span className="text-[11px] text-slate-500 font-medium" style={{ fontFamily: 'var(--font-heading)' }}>
+          &copy; {new Date().getFullYear()} ProtIntel &mdash; Explainable Protein Intelligence
+        </span>
+        <span className="text-[10px] text-slate-700">
+          ESM-2 · BiLSTM · CNN · Self-Attention · XAI
+        </span>
       </footer>
     </div>
   );

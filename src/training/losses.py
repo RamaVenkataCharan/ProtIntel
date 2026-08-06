@@ -224,3 +224,48 @@ def create_loss_function(
             f"Unknown loss type: {loss_type}. "
             f"Supported: 'cross_entropy', 'focal'"
         )
+
+
+class DiceLoss(nn.Module):
+    """Dice / Jaccard Loss for sequence segment overlap alignment."""
+
+    def __init__(self, smooth: float = 1.0, ignore_index: int = -100) -> None:
+        super().__init__()
+        self.smooth = smooth
+        self.ignore_index = ignore_index
+
+    def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        if logits.dim() == 3:
+            logits = logits.reshape(-1, logits.size(-1))
+            targets = targets.reshape(-1)
+
+        valid_mask = targets != self.ignore_index
+        if not valid_mask.any():
+            return torch.tensor(0.0, device=logits.device, requires_grad=True)
+
+        logits = logits[valid_mask]
+        targets = targets[valid_mask]
+
+        probs = F.softmax(logits, dim=-1)
+        targets_one_hot = F.one_hot(targets, num_classes=logits.size(-1)).float()
+
+        intersection = (probs * targets_one_hot).sum(dim=0)
+        cardinality = probs.sum(dim=0) + targets_one_hot.sum(dim=0)
+
+        dice_score = (2.0 * intersection + self.smooth) / (cardinality + self.smooth)
+        return 1.0 - dice_score.mean()
+
+
+class AdaptiveMultiTaskLoss(nn.Module):
+    """Homoscedastic uncertainty weighting for dynamic multi-task Q3/Q8 loss balancing."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.log_vars = nn.Parameter(torch.zeros(2))
+
+    def forward(self, loss_q3: torch.Tensor, loss_q8: torch.Tensor) -> torch.Tensor:
+        precision_q3 = torch.exp(-self.log_vars[0])
+        precision_q8 = torch.exp(-self.log_vars[1])
+        loss = precision_q3 * loss_q3 + self.log_vars[0] + precision_q8 * loss_q8 + self.log_vars[1]
+        return loss
+
