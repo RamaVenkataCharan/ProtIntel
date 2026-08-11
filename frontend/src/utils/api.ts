@@ -89,6 +89,12 @@ export async function fetchMetrics(): Promise<MetricsResponse> {
   return resp.json();
 }
 
+export async function fetchEvaluationCB513(): Promise<any> {
+  const resp = await fetch(`${API_BASE}/evaluation/cb513`);
+  if (!resp.ok) throw new Error('Failed to fetch CB513 evaluation metrics');
+  return resp.json();
+}
+
 export async function predictSequence(req: PredictRequest): Promise<PredictResponse | JobStatusResponse> {
   const resp = await fetch(`${API_BASE}/predict`, {
     method: 'POST',
