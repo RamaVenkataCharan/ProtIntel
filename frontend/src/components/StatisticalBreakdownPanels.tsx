@@ -16,17 +16,20 @@ export const StatisticalBreakdownPanels: React.FC<StatisticalBreakdownPanelsProp
   confidence,
 }) => {
   // Total sequence length
-  const totalLength = q3Prediction.length || 1;
+  const safeQ3 = q3Prediction || [];
+  const safeQ8 = q8Prediction || safeQ3;
+  const safeConf = confidence || [];
+  const totalLength = safeQ3.length || 1;
 
   // 1. Q3 Statistical Breakdown Calculation
   const q3Stats = useMemo(() => {
     const counts: Record<'H' | 'E' | 'C', number> = { H: 0, E: 0, C: 0 };
     const confSums: Record<'H' | 'E' | 'C', number> = { H: 0, E: 0, C: 0 };
 
-    q3Prediction.forEach((cls, i) => {
+    safeQ3.forEach((cls, i) => {
       const validCls = (cls === 'H' || cls === 'E' || cls === 'C') ? cls : 'C';
       counts[validCls]++;
-      confSums[validCls] += confidence[i] ?? 1.0;
+      confSums[validCls] += safeConf[i] ?? 1.0;
     });
 
     const keys: Array<'H' | 'E' | 'C'> = ['H', 'E', 'C'];
@@ -59,7 +62,7 @@ export const StatisticalBreakdownPanels: React.FC<StatisticalBreakdownPanelsProp
         avgConf: avgConf.toFixed(1),
       };
     });
-  }, [q3Prediction, confidence, totalLength]);
+  }, [safeQ3, safeConf, totalLength]);
 
   // 2. Q8 Statistical Breakdown Calculation
   const q8Stats = useMemo(() => {
@@ -71,10 +74,10 @@ export const StatisticalBreakdownPanels: React.FC<StatisticalBreakdownPanelsProp
     const confSums: Record<string, number> = {};
     q8Keys.forEach(k => { counts[k] = 0; confSums[k] = 0; });
 
-    q8Prediction.forEach((cls, i) => {
+    safeQ8.forEach((cls, i) => {
       const key = cls in counts ? cls : 'C';
       counts[key]++;
-      confSums[key] += confidence[i] ?? 1.0;
+      confSums[key] += safeConf[i] ?? 1.0;
     });
 
     const rawPcts = q8Keys.map(k => (counts[k] / totalLength) * 100);

@@ -18,6 +18,8 @@ interface ProteinStructure3DProps {
   onHoverResidue?: (idx: number | null) => void;
   viewMode?: ViewMode3D;
   onViewModeChange?: (mode: ViewMode3D) => void;
+  classificationMode?: 'q3' | 'q8';
+  onClassificationModeChange?: (mode: 'q3' | 'q8') => void;
 }
 
 // CameraController: Manages smooth 3/4 framing, target focus, reset, and cinematic fly-through
@@ -99,24 +101,34 @@ const CameraController: React.FC<CameraControllerProps> = ({
         return;
       }
 
-      const pointIdx = Math.floor(tourProgressRef.current * (foldedPoints.length - 1));
-      const pt = foldedPoints[pointIdx] || foldedPoints[0];
+      const totalSegments = foldedPoints.length - 1;
+      const exactIndex = tourProgressRef.current * totalSegments;
+      const i0 = Math.floor(exactIndex);
+      const i1 = Math.min(foldedPoints.length - 1, i0 + 1);
+      const alpha = exactIndex - i0;
 
-      // Smooth camera offset floating slightly above & right of current residue
-      const camPos = new THREE.Vector3(pt.x + 6, pt.y + 4, pt.z + 12);
+      const p0 = foldedPoints[i0];
+      const p1 = foldedPoints[i1];
+      const currentTarget = new THREE.Vector3().lerpVectors(p0, p1, alpha);
+
+      // Camera flies alongside slightly elevated (+Y, +Z)
+      const tangent = new THREE.Vector3().subVectors(p1, p0).normalize();
+      const normal = new THREE.Vector3(-tangent.z, 0.4, tangent.x).normalize();
+      const camPos = currentTarget.clone().add(normal.multiplyScalar(14)).add(new THREE.Vector3(0, 6, 0));
+
       state.camera.position.lerp(camPos, delta * 4);
-      state.camera.lookAt(pt);
-
       if (controls) {
-        controls.target.copy(pt);
+        controls.target.lerp(currentTarget, delta * 6);
+        controls.update();
       }
       return;
     }
 
-    // 3. Click-to-Inspect Focus Target
-    if (targetPosition && !isInteracting.current) {
-      const camPos = new THREE.Vector3(targetPosition.x, targetPosition.y + 4, targetPosition.z + 16);
-      state.camera.position.lerp(camPos, delta * 4);
+    // 3. Focus on Selected / Hovered / Scrubbed Residue
+    if (targetPosition && !isInteracting.current && !isCinematicTour) {
+      const offset = new THREE.Vector3(8, 6, 12);
+      const desiredCamPos = targetPosition.clone().add(offset);
+      state.camera.position.lerp(desiredCamPos, delta * 3);
       if (controls) {
         controls.target.lerp(targetPosition, delta * 4);
         controls.update();
@@ -127,39 +139,8 @@ const CameraController: React.FC<CameraControllerProps> = ({
   return null;
 };
 
-// GroupRig handles slow idle ambient spin (safely paused when inspecting or during tour/playback)
-interface GroupRigProps {
-  children: React.ReactNode;
-  reducedMotion: boolean;
-  isInteracting: React.MutableRefObject<boolean>;
-  isCinematicTour: boolean;
-  isPlaying: boolean;
-  hasSelection: boolean;
-}
+// CenterWrapper removed as it was unused
 
-const GroupRig: React.FC<GroupRigProps> = ({
-  children,
-  reducedMotion,
-  isInteracting,
-  isCinematicTour,
-  isPlaying,
-  hasSelection,
-}) => {
-  const groupRef = useRef<THREE.Group>(null);
-  const currentRotation = useRef(0);
-
-  // Pause ambient spin during active user interaction, tour, timeline playback, or residue inspection
-  const shouldSpin = !isInteracting.current && !reducedMotion && !isCinematicTour && !isPlaying && !hasSelection;
-
-  useFrame((_, delta) => {
-    if (groupRef.current && shouldSpin) {
-      currentRotation.current += delta * 0.04;
-      groupRef.current.rotation.y = currentRotation.current;
-    }
-  });
-
-  return <group ref={groupRef}>{children}</group>;
-};
 
 export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
   sequence,
@@ -172,6 +153,8 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
   onHoverResidue,
   viewMode: controlledViewMode,
   onViewModeChange,
+  classificationMode: controlledClassificationMode,
+  onClassificationModeChange,
 }) => {
   const { theme } = useThemeStore();
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -191,7 +174,22 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
     onViewModeChange?.(mode);
   };
 
-  const [colorMorph, setColorMorph] = useState(0); // 0 = Q3, 1 = Q8
+  const [internalClassification, setInternalClassification] = useState<'q3' | 'q8'>('q3');
+  const currentClassification = controlledClassificationMode !== undefined ? controlledClassificationMode : internalClassification;
+
+  const [colorMorph, setColorMorph] = useState(currentClassification === 'q8' ? 1.0 : 0.0);
+
+  useEffect(() => {
+    if (controlledClassificationMode !== undefined) {
+      setColorMorph(controlledClassificationMode === 'q8' ? 1.0 : 0.0);
+    }
+  }, [controlledClassificationMode]);
+
+  const handleClassificationModeChange = (mode: 'q3' | 'q8') => {
+    setInternalClassification(mode);
+    setColorMorph(mode === 'q8' ? 1.0 : 0.0);
+    onClassificationModeChange?.(mode);
+  };
   
   // Scrubber / Playback
   const [scrubberIndex, setScrubberIndex] = useState<number | null>(null);
@@ -238,6 +236,9 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
         setIsCinematicTour(false);
       } else if (e.key.toLowerCase() === 'r') {
         triggerReset();
+      } else if (e.key.toLowerCase() === 'q') {
+        const nextMode = currentClassification === 'q3' ? 'q8' : 'q3';
+        handleClassificationModeChange(nextMode);
       } else if (e.key.toLowerCase() === 'm') {
         setIsMeasuringMode((m) => !m);
       } else if (e.key.toLowerCase() === 't') {
@@ -248,7 +249,7 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [currentClassification]);
 
   // Compute backbone points for click-focus & measurement
   const pathData = useMemo(() => {
@@ -406,38 +407,79 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
 
           {/* View Mode Switcher */}
           <div className="h-4 w-[1px] bg-white/10 mx-1" />
-          <button
-            onClick={() => handleViewModeChange('structure')}
-            className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              viewMode === 'structure' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Structure Mode
-          </button>
-          <button
-            onClick={() => handleViewModeChange('xai')}
-            disabled={!residueImportance}
-            className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              viewMode === 'xai' ? 'bg-amber-500 text-black shadow-md' : 'text-slate-400 hover:text-slate-200 disabled:opacity-30'
-            }`}
-          >
-            XAI Heatmap
-          </button>
+          <div className="flex items-center gap-1 bg-black/40 p-0.5 rounded-xl border border-white/10">
+            <button
+              onClick={() => handleViewModeChange('structure')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                viewMode === 'structure' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Structure
+            </button>
+            <button
+              onClick={() => handleViewModeChange('xai')}
+              disabled={!residueImportance}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                viewMode === 'xai' ? 'bg-amber-500 text-black shadow-md font-bold' : 'text-slate-400 hover:text-slate-200 disabled:opacity-30'
+              }`}
+            >
+              XAI Heatmap
+            </button>
+          </div>
+
+          {/* Q3 ↔ Q8 Morph Transition Segmented Control */}
+          <div className="h-4 w-[1px] bg-white/10 mx-1" />
+          <div className="flex items-center gap-1 bg-black/40 p-0.5 rounded-xl border border-white/10">
+            <button
+              onClick={() => handleClassificationModeChange('q3')}
+              className={`px-2.5 py-0.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                currentClassification === 'q3' && colorMorph < 0.5
+                  ? 'bg-violet-600 text-white shadow'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Q3: 3-Class Coarse Structure (Helix/Sheet/Coil) [Q]"
+            >
+              Q3 (3-State)
+            </button>
+            <button
+              onClick={() => handleClassificationModeChange('q8')}
+              className={`px-2.5 py-0.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                currentClassification === 'q8' || colorMorph >= 0.5
+                  ? 'bg-teal-500 text-black shadow font-extrabold'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Q8: 8-State Detailed DSSP Granularity [Q]"
+            >
+              Q8 (8-State)
+            </button>
+          </div>
 
           {/* Q3 vs Q8 Morph Slider */}
-          <div className="h-4 w-[1px] bg-white/10 mx-1" />
-          <span className="text-[10px] font-mono text-slate-400 font-bold px-1">Q3</span>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.05"
-            value={colorMorph}
-            onChange={(e) => setColorMorph(parseFloat(e.target.value))}
-            className="w-16 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-teal-400"
-            title="Morph colors between Q3 and Q8"
-          />
-          <span className="text-[10px] font-mono text-slate-400 font-bold px-1">Q8</span>
+          <div className="flex items-center gap-1 px-1">
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.02"
+              value={colorMorph}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value);
+                setColorMorph(val);
+                if (val >= 0.5 && currentClassification !== 'q8') {
+                  setInternalClassification('q8');
+                  onClassificationModeChange?.('q8');
+                } else if (val < 0.5 && currentClassification !== 'q3') {
+                  setInternalClassification('q3');
+                  onClassificationModeChange?.('q3');
+                }
+              }}
+              className="w-14 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-teal-400"
+              title={`Morph Q3 ↔ Q8: ${(colorMorph * 100).toFixed(0)}%`}
+            />
+            <span className="text-[9px] font-mono text-slate-400 font-bold min-w-[24px]">
+              {colorMorph === 0 ? 'Q3' : colorMorph === 1 ? 'Q8' : `${(colorMorph * 100).toFixed(0)}%`}
+            </span>
+          </div>
         </div>
 
         {/* Action Tools: Snapshot, Measurement, Tour, Keyboard Guide */}
@@ -506,6 +548,7 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
             <div className="grid grid-cols-2 gap-3 text-xs font-mono">
               <div><kbd className="px-2 py-0.5 bg-white/10 rounded font-bold text-amber-400">Space</kbd> Play/Pause</div>
               <div><kbd className="px-2 py-0.5 bg-white/10 rounded font-bold text-amber-400">R</kbd> Reset Camera</div>
+              <div><kbd className="px-2 py-0.5 bg-white/10 rounded font-bold text-amber-400">Q</kbd> Toggle Q3 ↔ Q8</div>
               <div><kbd className="px-2 py-0.5 bg-white/10 rounded font-bold text-amber-400">Esc</kbd> Clear Selection</div>
               <div><kbd className="px-2 py-0.5 bg-white/10 rounded font-bold text-amber-400">M</kbd> Distance Tool</div>
               <div><kbd className="px-2 py-0.5 bg-white/10 rounded font-bold text-amber-400">T</kbd> Fly-Through Tour</div>
@@ -640,13 +683,7 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
             }}
           />
 
-          <GroupRig
-            reducedMotion={reducedMotion}
-            isInteracting={isInteracting}
-            isCinematicTour={isCinematicTour}
-            isPlaying={isPlaying}
-            hasSelection={selectedIndex !== null}
-          >
+          <>
             {hasData && (
               <ProteinRibbon
                 sequence={sequence!}
@@ -667,7 +704,7 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
                 onHoverResidue={handleHoverResidue}
               />
             )}
-          </GroupRig>
+          </>
         </Canvas>
       </div>
 

@@ -45,22 +45,19 @@ export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
 }) => {
   const instancedMeshRef = useRef<THREE.InstancedMesh>(null);
   
-  // Stored path data
-  const pathDataRef = useRef(generateProteinPath(sequence, q3Prediction));
+  // Synchronously compute path data whenever sequence or prediction changes to prevent out-of-bounds frame glitches
+  const pathData = React.useMemo(() => {
+    return generateProteinPath(sequence, q3Prediction);
+  }, [sequence, q3Prediction]);
+
   const revealProgressRef = useRef(reducedMotion ? 1 : 0);
   const pulseIndexRef = useRef<number | null>(null);
+  const currentMorphRef = useRef(colorMorph ?? 0);
 
-  // Re-generate path when sequence or prediction changes
+  // Reset reveal animation when resetTrigger or reducedMotion changes
   useEffect(() => {
-    pathDataRef.current = generateProteinPath(sequence, q3Prediction);
     revealProgressRef.current = reducedMotion ? 1 : 0;
-  }, [sequence, q3Prediction, reducedMotion]);
-
-  useEffect(() => {
-    if (!reducedMotion) {
-      revealProgressRef.current = 0;
-    }
-  }, [resetTrigger, reducedMotion]);
+  }, [sequence, q3Prediction, resetTrigger, reducedMotion]);
 
   // Pre-allocated temporaries for instance loop to prevent GC churn on long sequences
   const tempMatrix = useRef(new THREE.Matrix4()).current;
@@ -105,8 +102,22 @@ export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
     if (!mesh) return;
 
     const L = sequence.length;
-    const { foldedPoints, unfoldedPoints } = pathDataRef.current;
+    const limit = Math.max(0, L - 1);
+
+    // Dynamically sync instancedMesh instance count to current sequence segment length
+    if (mesh.count !== limit) {
+      mesh.count = limit;
+    }
+
+    if (limit === 0) return;
+
+    const { foldedPoints, unfoldedPoints } = pathData;
     const time = state.clock.getElapsedTime();
+
+    // 0. Smooth Q3 <-> Q8 Color Morph interpolation (~400-600ms organic crossfade)
+    const morphTarget = Math.max(0, Math.min(1, colorMorph ?? 0));
+    const morphSpeed = reducedMotion ? 100 : 6.0;
+    currentMorphRef.current += (morphTarget - currentMorphRef.current) * Math.min(1, delta * morphSpeed);
 
     // 1. Progress reveal animation
     if (revealProgressRef.current < 1 && !reducedMotion) {
@@ -146,8 +157,15 @@ export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
     }
     const impRange = (maxImp - minImp) > 1e-6 ? (maxImp - minImp) : 1.0;
 
-    const limit = L - 1;
     for (let i = 0; i < limit; i++) {
+      const p1_flat = unfoldedPoints[i];
+      const p2_flat = unfoldedPoints[i + 1];
+      const p1_folded = foldedPoints[i];
+      const p2_folded = foldedPoints[i + 1];
+
+      // Safety guard against array out of bounds during frame updates
+      if (!p1_flat || !p2_flat || !p1_folded || !p2_folded) continue;
+
       const q3 = q3Prediction[i] || 'C';
       const conf = confidence[i] !== undefined ? confidence[i] : 1.0;
       const rawImp = residueImportance?.[i] ?? minImp;
@@ -159,11 +177,6 @@ export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
         const localVal = (revealProgressRef.current - staggerDelay) / (1 - 0.45);
         localReveal = Math.max(0, Math.min(1, localVal));
       }
-
-      const p1_flat = unfoldedPoints[i];
-      const p2_flat = unfoldedPoints[i + 1];
-      const p1_folded = foldedPoints[i];
-      const p2_folded = foldedPoints[i + 1];
 
       tempCurP1.lerpVectors(p1_flat, p1_folded, localReveal);
       tempCurP2.lerpVectors(p2_flat, p2_folded, localReveal);
@@ -215,10 +228,19 @@ export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
       const q8Key = (q8Char && q8Char in Q8_STRUCTURE_COLORS) ? (q8Char as keyof typeof Q8_STRUCTURE_COLORS) : null;
 
       tempColorQ3.set(STRUCTURE_COLORS[q3Key].hex);
-      tempColorQ8.set(q8Key ? Q8_STRUCTURE_COLORS[q8Key].hex : STRUCTURE_COLORS[q3Key].hex);
 
-      // Interpolate between Q3 and Q8 structure colors via colorMorph slider
-      tempColorStruct.lerpColors(tempColorQ3, tempColorQ8, colorMorph);
+      if (q8Key) {
+        tempColorQ8.set(Q8_STRUCTURE_COLORS[q8Key].hex);
+        // Minority-class (I, B, S) muting in Q8
+        if (q8Key === 'I' || q8Key === 'B' || q8Key === 'S') {
+          tempColorQ8.lerp(colorLowConf, 0.25);
+        }
+      } else {
+        tempColorQ8.set(STRUCTURE_COLORS[q3Key].hex);
+      }
+
+      // Smoothly interpolate between Q3 and Q8 structure colors via currentMorphRef
+      tempColorStruct.lerpColors(tempColorQ3, tempColorQ8, currentMorphRef.current);
 
       let targetColor: THREE.Color;
 
@@ -261,8 +283,9 @@ export const ProteinRibbon: React.FC<ProteinRibbonProps> = ({
 
   return (
     <instancedMesh
+      key={sequence}
       ref={instancedMeshRef}
-      args={[null as any, null as any, sequence.length - 1]}
+      args={[null as any, null as any, Math.max(1, sequence.length - 1)]}
       castShadow
       receiveShadow
       onClick={(e) => {
