@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { fetchHealth, fetchModelInfo, fetchMetrics, type ModelInfoResponse, type MetricsResponse } from '../utils/api';
+import { fetchHealth, fetchModelInfo, fetchMetrics, fetchEvaluationCB513, type ModelInfoResponse, type MetricsResponse } from '../utils/api';
 
 interface ModelStoreState {
   isHealthy: boolean;
@@ -7,6 +7,7 @@ interface ModelStoreState {
   device: string;
   modelInfo: ModelInfoResponse | null;
   metrics: MetricsResponse | null;
+  cb513Evaluation: any | null;
   isLoading: boolean;
   error: string | null;
   checkStatus: () => Promise<void>;
@@ -18,6 +19,7 @@ export const useModelStore = create<ModelStoreState>((set) => ({
   device: 'unknown',
   modelInfo: null,
   metrics: null,
+  cb513Evaluation: null,
   isLoading: false,
   error: null,
 
@@ -27,10 +29,11 @@ export const useModelStore = create<ModelStoreState>((set) => ({
       const health = await fetchHealth();
       let info: ModelInfoResponse | null = null;
       let metrics: MetricsResponse | null = null;
+      let cb513Eval: any | null = null;
 
       if (health.model_loaded) {
         // Fetch remaining info in parallel
-        const [infoRes, metricsRes] = await Promise.all([
+        const [infoRes, metricsRes, evalRes] = await Promise.all([
           fetchModelInfo().catch((err) => {
             console.error('Failed to fetch model info:', err);
             return null;
@@ -38,10 +41,15 @@ export const useModelStore = create<ModelStoreState>((set) => ({
           fetchMetrics().catch((err) => {
             console.error('Failed to fetch metrics:', err);
             return null;
+          }),
+          fetchEvaluationCB513().catch((err) => {
+            console.error('Failed to fetch CB513 evaluation:', err);
+            return null;
           })
         ]);
         info = infoRes;
         metrics = metricsRes;
+        cb513Eval = evalRes;
       }
 
       set({
@@ -50,6 +58,7 @@ export const useModelStore = create<ModelStoreState>((set) => ({
         device: health.device,
         modelInfo: info,
         metrics: metrics,
+        cb513Evaluation: cb513Eval,
         isLoading: false,
       });
     } catch (err: any) {
@@ -59,6 +68,7 @@ export const useModelStore = create<ModelStoreState>((set) => ({
         device: 'unknown',
         modelInfo: null,
         metrics: null,
+        cb513Evaluation: null,
         error: err?.message || 'Failed to connect to backend service',
         isLoading: false,
       });

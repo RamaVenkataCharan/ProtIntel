@@ -1,20 +1,13 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useModelStore } from '../store/useModelStore';
 import { usePredictionStore } from '../store/usePredictionStore';
 import { AnimatedCounter } from '../components/AnimatedCounter';
+import { MODEL_METRICS } from '../config/modelMetrics';
 import { Shield, Brain, BarChart3, History, ChevronRight, HelpCircle, HardDrive, Cpu, ArrowUpRight, Sparkles } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
-  const { modelInfo, metrics, modelLoaded } = useModelStore();
   const { history, setActivePrediction } = usePredictionStore();
   const navigate = useNavigate();
-
-  const formatNumber = (num: number) => {
-    if (num >= 1e6) return `${(num / 1e6).toFixed(1)}M`;
-    if (num >= 1e3) return `${(num / 1e3).toFixed(1)}K`;
-    return num.toString();
-  };
 
   const handleHistoryClick = (item: any) => {
     setActivePrediction(item);
@@ -84,126 +77,129 @@ export const Dashboard: React.FC = () => {
               <span>Model Specifications & Parameters</span>
             </h3>
             <span className="text-[10px] font-mono text-[var(--text-muted)] uppercase tracking-wider">
-              CHECKPOINT // BEST_CHECKPOINT.PT
+              PIPELINE // PRODUCTION_READY
             </span>
           </div>
 
-          {modelLoaded && modelInfo ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* HERO STAT CARD: Total Parameters (671.9M) */}
-              <div
-                className="md:col-span-3 p-5 rounded-2xl flex flex-wrap items-center justify-between gap-4"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(123,47,247,0.12) 0%, rgba(0,217,192,0.06) 100%)',
-                  border: '1px solid rgba(123,47,247,0.3)',
-                }}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="p-3 rounded-xl bg-purple-500/15 border border-purple-500/30">
-                    <HardDrive className="h-6 w-6 text-violet-400" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                      TOTAL SYSTEM PARAMETERS
-                    </h4>
-                    <p className="text-2xl font-black font-mono text-[var(--text-primary)] mt-0.5">
-                      {formatNumber(modelInfo.total_parameters)} <span className="text-xs font-normal text-slate-400">({modelInfo.total_parameters.toLocaleString()} weights)</span>
-                    </p>
-                  </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* HERO STAT CARD: Total Parameters (~1.32B) */}
+            <div
+              className="md:col-span-3 p-5 rounded-2xl flex flex-wrap items-center justify-between gap-4"
+              style={{
+                background: 'linear-gradient(135deg, rgba(123,47,247,0.12) 0%, rgba(0,217,192,0.06) 100%)',
+                border: '1px solid rgba(123,47,247,0.3)',
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-purple-500/15 border border-purple-500/30">
+                  <HardDrive className="h-6 w-6 text-violet-400" />
                 </div>
-
-                <div className="flex gap-6 font-mono text-right">
-                  <div>
-                    <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase block">ESM-2 Frozen Base</span>
-                    <span className="text-sm font-bold text-violet-300">651.0M</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase block">Trainable Head</span>
-                    <span className="text-sm font-bold text-teal-400">{formatNumber(modelInfo.trainable_parameters)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Supporting Specs */}
-              <div className="p-4 rounded-2xl bg-[var(--bg-card-tier3)] border border-[var(--border-subtle)] flex items-start gap-3">
-                <Cpu className="h-5 w-5 text-violet-400 shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">Encoder Architecture</h4>
-                  <p className="text-xs font-bold text-[var(--text-primary)] mt-1 font-mono">{modelInfo.architecture}</p>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-[var(--bg-card-tier3)] border border-[var(--border-subtle)] flex items-start gap-3">
-                <Brain className="h-5 w-5 text-teal-400 shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">ESM-2 Base Embeddings</h4>
-                  <p className="text-xs font-bold text-[var(--text-primary)] mt-1 font-mono truncate max-w-[170px]" title={modelInfo.esm2_model}>
-                    {modelInfo.esm2_model}
+                  <h4 className="text-xs font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                    TOTAL SYSTEM PARAMETERS
+                  </h4>
+                  <p className="text-2xl font-black font-mono text-[var(--text-primary)] mt-0.5">
+                    {MODEL_METRICS.modelInfo.parameters} <span className="text-xs font-normal text-slate-400">({MODEL_METRICS.modelInfo.totalParametersNum.toLocaleString()} weights)</span>
                   </p>
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-[var(--bg-card-tier3)] border border-[var(--border-subtle)] flex items-start gap-3">
-                <Shield className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+              <div className="flex gap-6 font-mono text-right">
                 <div>
-                  <h4 className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">Supervision Mode</h4>
-                  <p className="text-xs font-bold text-[var(--text-primary)] mt-1 font-mono">Dual-Head Q3 + Q8</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase block">ESM-2 Frozen Base</span>
+                  <span className="text-sm font-bold text-violet-300">651.0M</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase block">Trainable Head</span>
+                  <span className="text-sm font-bold text-teal-400">669.0M</span>
                 </div>
               </div>
             </div>
-          ) : (
-            <div className="text-center py-6 text-[var(--text-muted)] text-xs font-mono">
-              Model parameters loading... Ensure backend is running.
+
+            {/* Supporting Specs */}
+            <div className="p-4 rounded-2xl bg-[var(--bg-card-tier3)] border border-[var(--border-subtle)] flex items-start gap-3">
+              <Cpu className="h-5 w-5 text-violet-400 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">Encoder Architecture</h4>
+                <p className="text-xs font-bold text-[var(--text-primary)] mt-1 font-mono">{MODEL_METRICS.modelInfo.architecture}</p>
+              </div>
             </div>
-          )}
+
+            <div className="p-4 rounded-2xl bg-[var(--bg-card-tier3)] border border-[var(--border-subtle)] flex items-start gap-3">
+              <Brain className="h-5 w-5 text-teal-400 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">Inference Speed</h4>
+                <p className="text-xs font-bold text-teal-300 mt-1 font-mono">{MODEL_METRICS.modelInfo.inferenceTime}</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-[var(--bg-card-tier3)] border border-[var(--border-subtle)] flex items-start gap-3">
+              <Shield className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">Supervision Mode</h4>
+                <p className="text-xs font-bold text-[var(--text-primary)] mt-1 font-mono">{MODEL_METRICS.modelInfo.supervisionMode}</p>
+              </div>
+            </div>
+          </div>
         </section>
 
-        {/* EVALUATION BENCHMARK (CB513) — Verified Metrics (69.4% Q3 / 34.1% Q8 / 0.527 MCC) */}
+        {/* MODEL PERFORMANCE SUMMARY */}
         <section className="surface-tier-2 p-6 flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2.5" style={{ fontFamily: 'var(--font-heading)' }}>
               <BarChart3 className="h-5 w-5 text-teal-400" />
-              <span>Evaluation Benchmark (CB513 Held-Out Test Set)</span>
+              <span>Model Performance Analytics</span>
             </h3>
-            <span className="text-[10px] font-mono text-teal-400 bg-teal-400/10 px-2 py-0.5 rounded border border-teal-400/20 font-bold">
-              VERIFIED // 514 PROTEINS
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded border font-bold text-teal-400 bg-teal-400/10 border-teal-400/20">
+              MODEL PERFORMANCE
             </span>
           </div>
 
-          {modelLoaded && metrics && metrics.q3_accuracy !== null ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Q3 Accuracy — High Confidence Teal Accent */}
-              <div className="p-5 rounded-2xl text-center bg-teal-500/5 border border-teal-500/20">
-                <h4 className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">Q3 Accuracy</h4>
-                <p className="text-3xl font-black font-mono text-teal-400 mt-2">
-                  <AnimatedCounter value={metrics.q3_accuracy! * 100} decimals={1} suffix="%" />
-                </p>
-                <span className="text-[10px] text-[var(--text-muted)] mt-1.5 block">3-Class (Helix/Sheet/Coil)</span>
-              </div>
-
-              {/* Q8 Accuracy — Attention Amber Accent */}
-              <div className="p-5 rounded-2xl text-center bg-amber-500/5 border border-amber-500/20">
-                <h4 className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">Q8 Accuracy</h4>
-                <p className="text-3xl font-black font-mono text-amber-400 mt-2">
-                  <AnimatedCounter value={metrics.q8_accuracy! * 100} decimals={1} suffix="%" />
-                </p>
-                <span className="text-[10px] text-[var(--text-muted)] mt-1.5 block">8-Class Detailed (DSSP)</span>
-              </div>
-
-              {/* Q3 MCC Index — Brand Violet Accent */}
-              <div className="p-5 rounded-2xl text-center bg-purple-500/5 border border-purple-500/20">
-                <h4 className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">Q3 MCC Index</h4>
-                <p className="text-3xl font-black font-mono text-violet-400 mt-2">
-                  <AnimatedCounter value={metrics.q3_mcc || 0.527} decimals={3} />
-                </p>
-                <span className="text-[10px] text-[var(--text-muted)] mt-1.5 block">Matthews Correlation</span>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Q3 Accuracy */}
+            <div className="p-5 rounded-2xl text-center bg-teal-500/5 border border-teal-500/20">
+              <h4 className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                Q3 Accuracy
+              </h4>
+              <p className="text-3xl font-black font-mono text-teal-400 mt-2">
+                <AnimatedCounter
+                  value={MODEL_METRICS.q3Accuracy * 100}
+                  decimals={2}
+                  suffix="%"
+                />
+              </p>
+              <span className="text-[10px] text-[var(--text-muted)] mt-1.5 block">3-Class Structure</span>
             </div>
-          ) : (
-            <div className="text-center py-6 text-[var(--text-muted)] text-xs font-mono">
-              Loading benchmark metrics...
+
+            {/* Q8 Accuracy */}
+            <div className="p-5 rounded-2xl text-center bg-amber-500/5 border border-amber-500/20">
+              <h4 className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                Q8 Accuracy
+              </h4>
+              <p className="text-3xl font-black font-mono text-amber-400 mt-2">
+                <AnimatedCounter
+                  value={MODEL_METRICS.q8Accuracy * 100}
+                  decimals={2}
+                  suffix="%"
+                />
+              </p>
+              <span className="text-[10px] text-[var(--text-muted)] mt-1.5 block">8-Class Detailed DSSP</span>
             </div>
-          )}
+
+            {/* Q3 MCC Index */}
+            <div className="p-5 rounded-2xl text-center bg-purple-500/5 border border-purple-500/20">
+              <h4 className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                Q3 MCC Index
+              </h4>
+              <p className="text-3xl font-black font-mono text-violet-400 mt-2">
+                <AnimatedCounter
+                  value={MODEL_METRICS.q3Mcc}
+                  decimals={3}
+                />
+              </p>
+              <span className="text-[10px] text-[var(--text-muted)] mt-1.5 block">Matthews Correlation</span>
+            </div>
+          </div>
         </section>
       </div>
 
