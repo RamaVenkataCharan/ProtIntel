@@ -94,10 +94,10 @@ export const Batch: React.FC = () => {
 
   const getQ3CountsStr = (q3_pred: string[]) => {
     const counts = { H: 0, E: 0, C: 0 };
-    q3_pred.forEach(c => {
+    (q3_pred || []).forEach(c => {
       if (c in counts) counts[c as 'H'|'E'|'C']++;
     });
-    const len = q3_pred.length;
+    const len = q3_pred?.length || 1;
     const h = (counts.H / len * 100).toFixed(0);
     const e = (counts.E / len * 100).toFixed(0);
     const c = (counts.C / len * 100).toFixed(0);

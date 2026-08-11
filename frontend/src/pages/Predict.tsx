@@ -59,14 +59,16 @@ interface StackedStripProps {
   confidence: number[];
   residueImportance?: number[] | null;
   activeTab: string;
+  activeClassification?: 'q3' | 'q8';
   hoveredIndex: number | null;
   searchPattern: string;
   onHover: (idx: number | null) => void;
+  onSelectClassification?: (mode: 'q3' | 'q8') => void;
 }
 
 const StackedSequenceStrip: React.FC<StackedStripProps> = ({
   sequence, q3Prediction, q8Prediction, confidence, residueImportance,
-  activeTab, hoveredIndex, searchPattern, onHover,
+  activeTab, activeClassification = 'q3', hoveredIndex, searchPattern, onHover, onSelectClassification,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const chars = sequence.split('');
@@ -126,10 +128,33 @@ const StackedSequenceStrip: React.FC<StackedStripProps> = ({
       <div
         ref={scrollRef}
         className="residue-strip rounded-2xl relative"
-        style={{ padding: '6px 6px 10px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-subtle)' }}
+        style={{ padding: '8px 8px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-subtle)' }}
         onMouseLeave={() => onHover(null)}
       >
-        <div className="flex gap-[2px] min-w-max">
+        {/* Q3 Track Header */}
+        <div
+          onClick={() => onSelectClassification?.('q3')}
+          className={`flex items-center justify-between mb-1.5 px-1 cursor-pointer transition-all select-none ${
+            activeClassification === 'q3' ? 'text-violet-300' : 'text-slate-400 hover:text-slate-200'
+          }`}
+          title="Click to mirror Q3 3-Class in 3D Viewer"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider">
+              Q3 Primary Structure (3-Class: Helix / Sheet / Coil)
+            </span>
+            {activeClassification === 'q3' && (
+              <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-extrabold bg-violet-500/20 text-violet-300 border border-violet-500/40 animate-pulse">
+                3D ACTIVE
+              </span>
+            )}
+          </div>
+          <span className="text-[9px] font-mono text-slate-500">H = Violet, E = Cyan, C = Slate</span>
+        </div>
+
+        <div className={`flex gap-[2px] min-w-max p-1 rounded-xl transition-all ${
+          activeClassification === 'q3' ? 'ring-1 ring-violet-500/40 bg-violet-950/20 shadow-[0_0_12px_rgba(139,92,246,0.15)]' : ''
+        }`}>
           {chars.map((aa, idx) => {
             const q3 = q3Prediction[idx] || 'C';
             const conf = confidence[idx] ?? 1;
@@ -154,6 +179,7 @@ const StackedSequenceStrip: React.FC<StackedStripProps> = ({
                   boxShadow: isMatch ? '0 0 10px #FFB347' : isHov ? `0 0 12px ${bgColor}` : 'none',
                 }}
                 onMouseEnter={() => onHover(idx)}
+                onClick={() => onSelectClassification?.('q3')}
               >
                 <span className="text-[8px] text-white/50 font-mono pt-[3px] leading-none">{idx + 1}</span>
                 <span className="text-[11px] text-white font-bold font-mono leading-none">{aa}</span>
@@ -163,7 +189,8 @@ const StackedSequenceStrip: React.FC<StackedStripProps> = ({
           })}
         </div>
 
-        <div className="relative h-[6px] min-w-max my-[2px]" style={{ width: Math.max(0, len * 26 + (len - 1) * 2) }}>
+        {/* Position Scrubber / Alignment Bar */}
+        <div className="relative h-[6px] min-w-max my-[4px]" style={{ width: Math.max(0, len * 26 + (len - 1) * 2) }}>
           <div className="absolute inset-0 rounded-none" style={{ background: 'linear-gradient(90deg, rgba(123,47,247,0.3), rgba(0,217,192,0.3), rgba(255,179,71,0.3))' }} />
           {hoveredIndex !== null && (
             <div
@@ -178,7 +205,30 @@ const StackedSequenceStrip: React.FC<StackedStripProps> = ({
           )}
         </div>
 
-        <div className="flex gap-[2px] min-w-max">
+        {/* Q8 Track Header */}
+        <div
+          onClick={() => onSelectClassification?.('q8')}
+          className={`flex items-center justify-between mt-2 mb-1.5 px-1 cursor-pointer transition-all select-none ${
+            activeClassification === 'q8' ? 'text-teal-300' : 'text-slate-400 hover:text-slate-200'
+          }`}
+          title="Click to mirror Q8 8-State DSSP in 3D Viewer"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider">
+              Q8 Detailed DSSP States (8-State Granularity)
+            </span>
+            {activeClassification === 'q8' && (
+              <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-extrabold bg-teal-500/20 text-teal-300 border border-teal-500/40 animate-pulse">
+                3D ACTIVE
+              </span>
+            )}
+          </div>
+          <span className="text-[9px] font-mono text-slate-500">H, G, I, E, B, T, S, C</span>
+        </div>
+
+        <div className={`flex gap-[2px] min-w-max p-1 rounded-xl transition-all ${
+          activeClassification === 'q8' ? 'ring-1 ring-teal-500/40 bg-teal-950/20 shadow-[0_0_12px_rgba(0,229,204,0.15)]' : ''
+        }`}>
           {chars.map((_, idx) => {
             const q8 = q8Prediction[idx] || 'C';
             const isMinority = MINORITY_Q8.has(q8);
@@ -197,6 +247,7 @@ const StackedSequenceStrip: React.FC<StackedStripProps> = ({
                   filter: isMinority ? 'saturate(0.4)' : undefined,
                 }}
                 onMouseEnter={() => onHover(idx)}
+                onClick={() => onSelectClassification?.('q8')}
               >
                 <span className="text-[9px] font-bold text-white/90 leading-none pt-[4px] font-mono">{q8}</span>
                 {isMinority && <span className="text-[7px] font-bold leading-none pb-[3px]" style={{ color: '#FFB347' }}>!</span>}
@@ -249,6 +300,7 @@ export const Predict: React.FC = () => {
   const [xaiMethod, setXaiMethod] = useState<'ig' | 'shap' | 'rollout'>('ig');
   const [validationError, setValidationError] = useState<string | null>(null);
   const [stripViewMode, setStripViewMode] = useState<'structure' | 'xai'>('structure');
+  const [classificationMode, setClassificationMode] = useState<'q3' | 'q8'>('q3');
   const [searchPattern, setSearchPattern] = useState('');
 
   const [hoveredResidue, setHoveredResidue] = useState<{
@@ -569,6 +621,8 @@ export const Predict: React.FC = () => {
                   onHoverResidue={setHoveredResidueByIndex}
                   viewMode={stripViewMode as any}
                   onViewModeChange={(m) => setStripViewMode(m as any)}
+                  classificationMode={classificationMode}
+                  onClassificationModeChange={setClassificationMode}
                 />
               </Suspense>
 
@@ -605,9 +659,11 @@ export const Predict: React.FC = () => {
                 confidence={activePrediction.confidence}
                 residueImportance={activePrediction.residue_importance}
                 activeTab={stripViewMode}
+                activeClassification={classificationMode}
                 hoveredIndex={hoveredResidue?.index ?? null}
                 searchPattern={searchPattern}
                 onHover={setHoveredResidueByIndex}
+                onSelectClassification={setClassificationMode}
               />
 
               {/* PART 2: Q3 AND Q8 STATISTICAL BREAKDOWN PANELS */}
