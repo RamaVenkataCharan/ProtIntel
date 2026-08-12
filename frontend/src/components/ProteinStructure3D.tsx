@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
+import { EffectComposer, DepthOfField } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import { ProteinRibbon, type ViewMode3D } from './ProteinRibbon';
+import { ReflectivePedestal } from './ReflectivePedestal';
 import { RotateCcw, Play, Pause, Ruler, Camera, X, Download, Keyboard } from 'lucide-react';
 import { useThemeStore } from '../store/useThemeStore';
 import { generateProteinPath } from '../utils/pathGenerator';
@@ -649,11 +651,8 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
           <directionalLight position={[0, -12, -30]} intensity={2.4} color="#C4B5FD" />
           <pointLight position={[0, -20, 0]} intensity={0.8} color="#00E5CC" />
 
-          {/* Dynamic Ground Contact Shadow Disc */}
-          <mesh position={[0, -boundingRadius - 2, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-            <circleGeometry args={[boundingRadius * 2.2, 32]} />
-            <meshBasicMaterial color="#020408" transparent opacity={0.55} />
-          </mesh>
+          {/* Feature 7: Reflective Pedestal (replaces shadow disc) */}
+          <ReflectivePedestal boundingRadius={boundingRadius} isMobile={isMobile} />
 
           {/* Dynamic Camera Controller with Smooth Handover */}
           <CameraController
@@ -705,6 +704,18 @@ export const ProteinStructure3D: React.FC<ProteinStructure3DProps> = ({
               />
             )}
           </>
+
+          {/* Feature 6: Depth-of-Field Focus Blur on Selection */}
+          {!isMobile && hasData && selectedIndex !== null && !isCinematicTour && (
+            <EffectComposer>
+              <DepthOfField
+                focusDistance={0}
+                focalLength={0.035}
+                bokehScale={4}
+                height={480}
+              />
+            </EffectComposer>
+          )}
         </Canvas>
       </div>
 

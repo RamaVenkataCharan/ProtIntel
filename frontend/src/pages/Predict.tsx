@@ -4,6 +4,7 @@ import { useModelStore } from '../store/useModelStore';
 import { StatisticalBreakdownPanels } from '../components/StatisticalBreakdownPanels';
 
 const ProteinStructure3D = lazy(() => import('../components/ProteinStructure3D').then(m => ({ default: m.ProteinStructure3D })));
+const AssemblyLoader = lazy(() => import('../components/AssemblyLoader'));
 
 import { STRUCTURE_COLORS, Q8_STRUCTURE_COLORS, getXAIColorHex } from '../utils/colors';
 import { Play, AlertCircle, Sparkles, Cpu, Download, Search, FileSpreadsheet } from 'lucide-react';
@@ -264,26 +265,35 @@ const StackedSequenceStrip: React.FC<StackedStripProps> = ({
 // COMPUTING ACTIVE LOADING STATE
 // =============================================================================
 const PredictionLoadingState: React.FC<{ jobStatus: string | null }> = ({ jobStatus }) => (
-  <div className="flex-1 flex flex-col items-center justify-center rounded-3xl p-12 text-center min-h-[500px] relative overflow-hidden bg-mesh-panel border border-[var(--aurora-teal)]/30">
-    <div className="animate-laser-scan" />
-    <div className="flex items-end gap-[4px] mb-8 p-4 rounded-2xl bg-black/40 border border-white/[0.08]">
-      {Array.from({ length: 32 }, (_, i) => (
-        <div
-          key={i}
-          className="rounded-sm"
-          style={{
-            width: 6,
-            height: 16 + Math.sin(i * 0.6) * 14,
-            backgroundColor: i < 10 ? '#7B2FF7' : i < 22 ? '#00D9C0' : '#FFB347',
-            opacity: 0.3 + (i / 31) * 0.7,
-            animation: `residue-pulse 1.1s ease-in-out ${i * 0.04}s infinite`,
-          }}
-        />
-      ))}
-    </div>
-    <h5 className="text-base font-bold text-[var(--text-primary)]" style={{ fontFamily: 'var(--font-heading)' }}>
-      {jobStatus === 'pending' ? 'Job Queued — Waiting for Worker' : jobStatus === 'processing' ? 'Computing XAI Attributions' : 'ESM-2 Neural Inference Active'}
-    </h5>
+  <div className="flex-1 flex flex-col items-center justify-center min-h-[500px]">
+    <Suspense fallback={
+      <div className="flex-1 flex flex-col items-center justify-center rounded-3xl p-12 text-center min-h-[500px] relative overflow-hidden bg-mesh-panel border border-[var(--aurora-teal)]/30">
+        <div className="animate-laser-scan" />
+        <div className="flex items-end gap-[4px] mb-8 p-4 rounded-2xl bg-black/40 border border-white/[0.08]">
+          {Array.from({ length: 32 }, (_, i) => (
+            <div
+              key={i}
+              className="rounded-sm"
+              style={{
+                width: 6,
+                height: 16 + Math.sin(i * 0.6) * 14,
+                backgroundColor: i < 10 ? '#7B2FF7' : i < 22 ? '#00D9C0' : '#FFB347',
+                opacity: 0.3 + (i / 31) * 0.7,
+                animation: `residue-pulse 1.1s ease-in-out ${i * 0.04}s infinite`,
+              }}
+            />
+          ))}
+        </div>
+        <h5 className="text-base font-bold text-[var(--text-primary)]" style={{ fontFamily: 'var(--font-heading)' }}>
+          ESM-2 Neural Inference Active
+        </h5>
+      </div>
+    }>
+      <AssemblyLoader
+        jobStatus={jobStatus as any}
+        isComplete={false}
+      />
+    </Suspense>
   </div>
 );
 
