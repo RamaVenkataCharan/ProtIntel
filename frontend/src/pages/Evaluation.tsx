@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { useModelStore } from '../store/useModelStore';
 import { MODEL_METRICS } from '../config/modelMetrics';
 import {
@@ -19,6 +19,9 @@ import {
 } from 'lucide-react';
 import { AnimatedCounter } from '../components/AnimatedCounter';
 import { AttentionHeatmap } from '../components/AttentionHeatmap';
+
+// Lazy-load 3D benchmark chart to avoid adding to initial bundle
+const BenchmarkBarChart3D = lazy(() => import('../components/BenchmarkBarChart3D'));
 
 export const Evaluation: React.FC = () => {
   const { device } = useModelStore();
@@ -448,6 +451,30 @@ export const Evaluation: React.FC = () => {
               Note: Diagonal elements illustrate class recall with realistic minor H/E and E/C confusion off-diagonals.
             </p>
           </div>
+        </section>
+
+        {/* ── FEATURE 4: 3D BENCHMARK COMPARISON CHART ──────────────────── */}
+        <section className="surface-tier-2 p-6 flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)' }}>
+              <BarChart3 className="h-5 w-5 text-violet-400" />
+              <span>3D Benchmark Comparison (CB513)</span>
+            </h3>
+            <span className="text-[10px] font-mono text-violet-400 bg-violet-400/10 px-2 py-0.5 rounded border border-violet-400/20 font-bold">
+              CB513_VERIFIED
+            </span>
+          </div>
+          <p className="text-xs text-[var(--text-secondary)]">
+            Rotatable 3D comparison of Q3 Accuracy, Q8 Accuracy, and Q3 MCC across evaluated configurations.
+            All values sourced from verified CB513 evaluation artifacts. Drag to rotate.
+          </p>
+          <Suspense fallback={
+            <div className="w-full h-[400px] rounded-2xl bg-[var(--bg-card-tier3)] border border-[var(--border-subtle)] flex items-center justify-center">
+              <span className="text-[10px] font-mono text-[var(--text-muted)] animate-pulse">Loading 3D chart...</span>
+            </div>
+          }>
+            <BenchmarkBarChart3D />
+          </Suspense>
         </section>
 
         {/* ── ATTENTION VISUALIZATION ───────────────────────────────────── */}
