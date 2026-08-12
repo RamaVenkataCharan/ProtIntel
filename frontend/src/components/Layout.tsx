@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useModelStore } from '../store/useModelStore';
 import { useThemeStore } from '../store/useThemeStore';
 import { Activity, Server, AlertTriangle, BarChart3, Database, Layers, Sun, Moon, Search } from 'lucide-react';
 import { CommandPalette } from './CommandPalette';
+
+const ParticleField = lazy(() => import('./ParticleField'));
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -188,11 +190,16 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         {children}
       </main>
 
-      <footer className="border-t border-white/[0.04] py-5 text-center flex flex-col items-center gap-1">
-        <span className="text-[11px] text-slate-500 font-medium" style={{ fontFamily: 'var(--font-heading)' }}>
+      <footer className="border-t border-white/[0.04] py-5 text-center flex flex-col items-center gap-1 relative overflow-hidden" style={{ minHeight: 80 }}>
+        {/* Feature 3: Cursor-Reactive Particle Field */}
+        <Suspense fallback={null}>
+          <ParticleField />
+        </Suspense>
+
+        <span className="text-[11px] text-slate-500 font-medium relative z-10" style={{ fontFamily: 'var(--font-heading)' }}>
           &copy; {new Date().getFullYear()} ProtIntel &mdash; Explainable Protein Intelligence
         </span>
-        <span className="text-[10px] text-slate-700">
+        <span className="text-[10px] text-slate-700 relative z-10">
           ESM-2 · BiLSTM · CNN · Self-Attention · XAI
         </span>
       </footer>
