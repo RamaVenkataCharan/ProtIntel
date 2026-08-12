@@ -1,9 +1,13 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePredictionStore } from '../store/usePredictionStore';
 import { AnimatedCounter } from '../components/AnimatedCounter';
 import { MODEL_METRICS } from '../config/modelMetrics';
 import { Shield, Brain, BarChart3, History, ChevronRight, HelpCircle, HardDrive, Cpu, ArrowUpRight, Sparkles } from 'lucide-react';
+
+// Lazy-load 3D features to avoid bloating the main bundle
+const HeroBackdrop3D = lazy(() => import('../components/HeroBackdrop3D'));
+const ScrollFoldingAnimation = lazy(() => import('../components/ScrollFoldingAnimation'));
 
 export const Dashboard: React.FC = () => {
   const { history, setActivePrediction } = usePredictionStore();
@@ -29,6 +33,11 @@ export const Dashboard: React.FC = () => {
               transform: 'translate(30%, -30%)',
             }}
           />
+
+          {/* Feature 1: Ambient 3D Backdrop */}
+          <Suspense fallback={null}>
+            <HeroBackdrop3D />
+          </Suspense>
 
           <div className="max-w-xl relative z-10">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--aurora-violet)]/10 border border-[var(--aurora-violet)]/30 text-[var(--aurora-violet-mid)] text-xs font-mono font-semibold uppercase tracking-wider mb-4">
@@ -68,6 +77,15 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
         </section>
+
+        {/* Feature 2: Scroll-Driven Protein Folding Animation */}
+        <Suspense fallback={
+          <div className="w-full h-[200px] flex items-center justify-center">
+            <span className="text-[10px] font-mono text-[var(--text-muted)]">Loading 3D viewer...</span>
+          </div>
+        }>
+          <ScrollFoldingAnimation />
+        </Suspense>
 
         {/* MODEL SPECIFICATIONS — Hero Stat Box + Tier-2 Specs */}
         <section className="surface-tier-2 p-6 flex flex-col gap-4">
