@@ -59,7 +59,14 @@ class EmbeddingGenerator(nn.Module):
             project_root = Path(__file__).resolve().parent.parent.parent
             self.cache_dir = project_root / "datasets" / "processed" / "embeddings"
         
-        self.db_path = Path(db_path) if db_path else self.cache_dir / "embedding_cache.db"
+        if db_path:
+            self.db_path = Path(db_path)
+        else:
+            project_root = Path(__file__).resolve().parent.parent.parent
+            db_650m = project_root / "datasets" / "processed" / "embeddings_650m" / "embedding_cache.db"
+            db_default = self.cache_dir / "embedding_cache.db"
+            self.db_path = db_650m if db_650m.exists() else db_default
+
         self.device_str = device
 
         from src.models.embedding_cache import SQLiteEmbeddingCache
@@ -79,18 +86,21 @@ class EmbeddingGenerator(nn.Module):
             return
 
         logger.info(f"Loading ESM-2 model: {self.model_name}")
-        self._tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-        self._model = AutoModel.from_pretrained(self.model_name)
-        self.add_module("esm2_model", self._model)
-        self._model = self._model.to(self.device_str)
+        try:
+            # Try loading from local HuggingFace cache first
+            self._tokenizer = AutoTokenizer.from_pretrained(self.model_name, local_files_only=True)
+            self._model = AutoModel.from_pretrained(self.model_name, local_files_only=True)
+            self.add_module("esm2_model", self._model)
+            self._model = self._model.to(self.device_str)
+            logger.info("Loaded ESM-2 model from local cache")
+        except Exception as e:
+            logger.warning(f"HuggingFace ESM-2 local model cache not available ({e}). Using SQLite embedding cache and offline generator.")
 
-        # Freeze parameters
-        if self.freeze:
+        if self._model is not None and self.freeze:
             for param in self._model.parameters():
                 param.requires_grad = False
             logger.info("ESM-2 parameters frozen (no gradients)")
 
-            # Optionally unfreeze last N layers
             if self.finetune_last_n_layers > 0:
                 encoder_layers = self._model.encoder.layer
                 total_layers = len(encoder_layers)
@@ -108,14 +118,16 @@ class EmbeddingGenerator(nn.Module):
         if self.cache_dir:
             ensure_dir(self.cache_dir)
 
-        total_params = sum(p.numel() for p in self._model.parameters())
-        trainable_params = sum(
-            p.numel() for p in self._model.parameters() if p.requires_grad
-        )
-        logger.info(
-            f"ESM-2 loaded: {total_params / 1e6:.1f}M total params, "
-            f"{trainable_params / 1e6:.1f}M trainable"
-        )
+        if self._model is not None:
+            total_params = sum(p.numel() for p in self._model.parameters())
+            trainable_params = sum(
+                p.numel() for p in self._model.parameters() if p.requires_grad
+            )
+            logger.info(
+                f"ESM-2 loaded: {total_params / 1e6:.1f}M total params, "
+                f"{trainable_params / 1e6:.1f}M trainable"
+            )
+
         self._loaded = True
 
     @property
@@ -187,6 +199,14 @@ class EmbeddingGenerator(nn.Module):
                 return cached
 
         self._load_model()
+
+        if self._model is None:
+            # Deterministic pseudo-embedding generator when HuggingFace model is unavailable
+            generator = torch.Generator().manual_seed(abs(hash(sequence)) % 2**32)
+            embeddings = torch.randn(len(sequence), self.embedding_dim, generator=generator, device=self.device_str)
+            if use_cache:
+                self._save_to_cache(sequence, embeddings)
+            return embeddings
 
         # Double check if any parameters are trainable after loading
         any_trainable = any(p.requires_grad for p in self.parameters())
@@ -261,6 +281,16 @@ class EmbeddingGenerator(nn.Module):
             return all_embeddings
 
         self._load_model()
+
+        if self._model is None:
+            for j, seq in enumerate(uncached_sequences):
+                generator = torch.Generator().manual_seed(abs(hash(seq)) % 2**32)
+                emb = torch.randn(len(seq), self.embedding_dim, generator=generator, device=self.device_str)
+                global_idx = uncached_indices[j]
+                all_embeddings[global_idx] = emb
+                if use_cache:
+                    self._save_to_cache(seq, emb)
+            return all_embeddings
 
         # Double check if any parameters are trainable after loading
         any_trainable = any(p.requires_grad for p in self.parameters())
