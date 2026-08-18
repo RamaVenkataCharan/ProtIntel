@@ -5,18 +5,6 @@ import { generateProteinPath } from '../utils/pathGenerator';
 import { MODEL_METRICS } from '../config/modelMetrics';
 import { STRUCTURE_COLORS } from '../utils/colors';
 
-/**
- * AssemblyLoader — 3D ribbon assembly animation shown during prediction loading.
- *
- * Replaces the skeleton loader for the 3D viewer while predictions are running.
- * The ribbon assembles residue-by-residue at a pace that loosely corresponds
- * to the actual loading state (pending = slow, processing = faster, complete = instant).
- *
- * - Gracefully handles fast loads (skip animation) and slow loads (pace with job status)
- * - Falls back to a skeleton loader if WebGL init fails
- * - Respects prefers-reduced-motion
- */
-
 interface AssemblyRibbonProps {
   revealCount: number;
   totalSegments: number;
@@ -32,7 +20,6 @@ const AssemblyRibbon: React.FC<AssemblyRibbonProps> = ({ revealCount, totalSegme
     );
   }, []);
 
-  // Pre-allocated temporaries
   const tempMatrix = useMemo(() => new THREE.Matrix4(), []);
   const tempPos = useMemo(() => new THREE.Vector3(), []);
   const tempDir = useMemo(() => new THREE.Vector3(), []);
@@ -49,7 +36,6 @@ const AssemblyRibbon: React.FC<AssemblyRibbonProps> = ({ revealCount, totalSegme
     const time = state.clock.getElapsedTime();
     const limit = Math.min(totalSegments, Math.floor(revealCount));
 
-    // Update instance count
     mesh.count = limit;
     if (limit === 0) return;
 
@@ -73,7 +59,6 @@ const AssemblyRibbon: React.FC<AssemblyRibbonProps> = ({ revealCount, totalSegme
       if (q3 === 'H') { w = 0.7; h = 0.7; }
       else if (q3 === 'E') { w = 2.0; h = 0.1; }
 
-      // Staggered scale-in: newest segments pulse into existence
       const age = revealCount - i;
       const scaleIn = Math.min(1, age * 0.5);
 
@@ -81,11 +66,9 @@ const AssemblyRibbon: React.FC<AssemblyRibbonProps> = ({ revealCount, totalSegme
       tempMatrix.compose(tempPos, tempQuat, tempScale);
       mesh.setMatrixAt(i, tempMatrix);
 
-      // Color with subtle pulse on newest segments
       const key = (q3 === 'H' || q3 === 'E' || q3 === 'C') ? q3 : 'C';
       tempColor.set(STRUCTURE_COLORS[key].hex);
 
-      // Newest 3 segments glow brighter
       if (age < 3) {
         const pulse = Math.sin(time * 6 + i * 0.5) * 0.15 + 1.0;
         tempColor.multiplyScalar(pulse);
@@ -106,19 +89,17 @@ const AssemblyRibbon: React.FC<AssemblyRibbonProps> = ({ revealCount, totalSegme
     >
       <cylinderGeometry args={[0.5, 0.5, 1, 8]} />
       <meshStandardMaterial
-        roughness={0.35}
-        metalness={0.15}
+        roughness={0.3}
+        metalness={0.2}
         emissive="#1e1b4b"
-        emissiveIntensity={0.3}
+        emissiveIntensity={0.35}
       />
     </instancedMesh>
   );
 };
 
 interface AssemblyLoaderProps {
-  /** Current async job status from the prediction store */
   jobStatus: 'pending' | 'processing' | 'completed' | 'failed' | null;
-  /** Whether prediction has been delivered */
   isComplete: boolean;
 }
 
@@ -137,7 +118,6 @@ export const AssemblyLoader: React.FC<AssemblyLoaderProps> = ({
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   }, []);
 
-  // WebGL availability check
   useEffect(() => {
     const timeout = setTimeout(() => {
       try {
@@ -151,7 +131,6 @@ export const AssemblyLoader: React.FC<AssemblyLoaderProps> = ({
     return () => clearTimeout(timeout);
   }, []);
 
-  // Animation: increment revealCount at a pace driven by jobStatus
   useEffect(() => {
     if (reducedMotion || webglFailed || isComplete) return;
 
@@ -162,11 +141,11 @@ export const AssemblyLoader: React.FC<AssemblyLoaderProps> = ({
 
       let speed: number;
       if (isComplete) {
-        speed = 80; // Rush to finish
+        speed = 80;
       } else if (jobStatus === 'processing') {
-        speed = 8; // Building anticipation
+        speed = 9;
       } else {
-        speed = 2; // Slow simulated waiting
+        speed = 2.5;
       }
 
       setRevealCount((prev) => {
@@ -185,41 +164,45 @@ export const AssemblyLoader: React.FC<AssemblyLoaderProps> = ({
     };
   }, [jobStatus, isComplete, totalSegments, reducedMotion, webglFailed]);
 
-  // If complete, fast-forward
   useEffect(() => {
     if (isComplete) {
       setRevealCount(totalSegments);
     }
   }, [isComplete, totalSegments]);
 
-  // Fallback: skeleton loader
   if (webglFailed || reducedMotion) {
     return <SkeletonLoader />;
   }
 
+  const pct = Math.min(100, Math.round((revealCount / totalSegments) * 100));
+
   return (
-    <div className="w-full h-[460px] bg-[radial-gradient(circle_at_50%_30%,#161b2e_0%,#090d18_70%,#04060b_100%)] border border-[var(--border-subtle)] rounded-3xl relative overflow-hidden flex flex-col items-center justify-center">
-      {/* Status label */}
-      <div className="absolute top-4 left-4 z-10">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-violet-500 animate-pulse" />
-          <span className="text-[10px] font-mono font-bold text-violet-400 uppercase tracking-widest">
-            ASSEMBLY // {jobStatus === 'processing' ? 'COMPUTING' : 'QUEUED'}
+    <div className="w-full h-[460px] surface-tier-2 border border-[var(--border-muted)] rounded-3xl relative overflow-hidden flex flex-col items-center justify-center">
+      {/* Laser scan highlight */}
+      <div className="animate-laser-scan" />
+
+      {/* Status HUD Header */}
+      <div className="absolute top-5 left-5 right-5 z-10 flex items-center justify-between">
+        <div className="flex items-center gap-2.5 bg-black/50 px-3 py-1.5 rounded-xl border border-white/10 backdrop-blur-md">
+          <span className="w-2 h-2 rounded-full bg-[var(--aurora-teal)] animate-pulse" />
+          <span className="text-[10px] font-mono font-bold text-teal-300 uppercase tracking-widest">
+            RIBBON ASSEMBLY // {jobStatus === 'processing' ? 'COMPUTING_EMBEDDINGS' : 'INITIALIZING'}
           </span>
         </div>
-        <span className="text-[9px] font-mono text-slate-500 mt-0.5 block">
-          {Math.floor(revealCount)}/{totalSegments} residues
+        <span className="text-[11px] font-mono font-bold text-slate-300 bg-black/50 px-2.5 py-1 rounded-xl border border-white/10">
+          {pct}% ({Math.floor(revealCount)}/{totalSegments} aa)
         </span>
       </div>
 
-      {/* Progress bar */}
-      <div className="absolute bottom-4 left-4 right-4 z-10">
-        <div className="h-1 bg-black/40 rounded-full overflow-hidden">
+      {/* Assembly Progress Bar */}
+      <div className="absolute bottom-5 left-5 right-5 z-10">
+        <div className="h-1.5 bg-black/60 rounded-full overflow-hidden border border-white/10 p-[1px]">
           <div
             className="h-full rounded-full transition-all duration-100"
             style={{
               width: `${(revealCount / totalSegments) * 100}%`,
-              background: 'linear-gradient(90deg, #7B2FF7, #00D9C0)',
+              background: 'linear-gradient(90deg, var(--aurora-violet), var(--aurora-teal))',
+              boxShadow: '0 0 10px var(--aurora-teal-glow)',
             }}
           />
         </div>
@@ -227,9 +210,9 @@ export const AssemblyLoader: React.FC<AssemblyLoaderProps> = ({
 
       <Canvas
         gl={{ antialias: true, powerPreference: 'high-performance' }}
-        camera={{ fov: 40, position: [0, 8, 30], near: 0.1, far: 200 }}
+        camera={{ fov: 38, position: [0, 8, 32], near: 0.1, far: 200 }}
       >
-        <color attach="background" args={['#070a12']} />
+        <color attach="background" args={['#040711']} />
         <ambientLight intensity={0.8} />
         <directionalLight position={[15, 20, 15]} intensity={1.4} color="#F8FAFC" />
         <directionalLight position={[-10, 10, 15]} intensity={0.6} color="#C4B5FD" />
@@ -241,18 +224,17 @@ export const AssemblyLoader: React.FC<AssemblyLoaderProps> = ({
   );
 };
 
-/** Simple skeleton loader fallback matching the app's design */
 const STRAND_COLORS = ['#7B2FF7', '#9B59F5', '#A16AE8', '#00D9C0', '#66E8D5', '#FFB347', '#9B59F5', '#7B2FF7'];
 
 const SkeletonLoader: React.FC = () => (
-  <div className="w-full h-[460px] bg-[radial-gradient(circle_at_50%_30%,#161b2e_0%,#090d18_70%,#04060b_100%)] border border-[var(--border-subtle)] rounded-3xl flex flex-col items-center justify-center gap-4">
-    <div className="flex items-end gap-[4px] p-3 rounded-2xl bg-black/40 border border-white/[0.06]">
+  <div className="w-full h-[460px] surface-tier-2 border border-[var(--border-muted)] rounded-3xl flex flex-col items-center justify-center gap-4">
+    <div className="flex items-end gap-1 p-3.5 rounded-2xl bg-black/40 border border-white/[0.08]">
       {STRAND_COLORS.map((hex, i) => (
         <div
           key={i}
           className="w-[5px] rounded-full"
           style={{
-            height: 28,
+            height: 30,
             backgroundColor: hex,
             animation: `residue-pulse 1.1s ease-in-out ${i * 0.08}s infinite`,
             boxShadow: `0 0 8px ${hex}80`,
@@ -262,12 +244,11 @@ const SkeletonLoader: React.FC = () => (
     </div>
     <div className="flex flex-col items-center gap-1">
       <span
-        className="text-xs font-bold text-slate-300 tracking-widest uppercase"
-        style={{ fontFamily: 'var(--font-heading)' }}
+        className="text-xs font-bold text-slate-300 tracking-widest uppercase font-mono"
       >
         PREDICTING STRUCTURE
       </span>
-      <span className="text-[10px] font-mono text-slate-600 tracking-wider">
+      <span className="text-[10px] font-mono text-slate-500 tracking-wider">
         SYS_INFERENCE // ASSEMBLING_RIBBON
       </span>
     </div>

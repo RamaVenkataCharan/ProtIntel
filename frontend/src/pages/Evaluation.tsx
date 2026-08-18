@@ -12,7 +12,6 @@ import {
   ShieldCheck,
   Sparkles,
   Layers,
-  Activity,
   Cpu,
   Clock,
   PieChart
@@ -20,7 +19,7 @@ import {
 import { AnimatedCounter } from '../components/AnimatedCounter';
 import { AttentionHeatmap } from '../components/AttentionHeatmap';
 
-// Lazy-load 3D benchmark chart to avoid adding to initial bundle
+// Lazy-load 3D benchmark chart
 const BenchmarkBarChart3D = lazy(() => import('../components/BenchmarkBarChart3D'));
 
 export const Evaluation: React.FC = () => {
@@ -41,39 +40,39 @@ export const Evaluation: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
-      {/* ── PAGE HEADER & BADGE ────────────────────────────────────────── */}
+      {/* ── PAGE HEADER & TELEMETRY BADGE ────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <CheckCircle2 className="h-4 w-4 text-teal-400" />
+            <CheckCircle2 className="h-4 w-4 text-[var(--aurora-teal)]" strokeWidth={2} />
             <span className="text-[10px] font-mono font-bold text-teal-400 uppercase tracking-widest">
               PROTINTEL_ANALYTICS // MODEL_PERFORMANCE
             </span>
           </div>
           <h2 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]" style={{ fontFamily: 'var(--font-heading)' }}>
-            ProtIntel Prediction Results & Model Analytics
+            Model Benchmarks & Statistical Performance
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-            Comprehensive model performance metrics and residue-level secondary structure evaluation
+            Verified secondary structure accuracy, Matthews correlation, confusion distributions, and 3D comparisons
           </p>
         </div>
 
         {/* Status & Analytics Badge */}
-        <div className="flex items-center gap-3 bg-black/40 border border-teal-500/30 p-3 rounded-2xl shadow-lg backdrop-blur-md">
+        <div className="flex items-center gap-3 surface-tier-2 p-3.5 rounded-2xl border border-teal-500/30">
           <div className="p-2 rounded-xl bg-teal-500/15 border border-teal-500/30 shrink-0">
-            <ShieldCheck className="h-5 w-5 text-teal-400" />
+            <ShieldCheck className="h-5 w-5 text-teal-400" strokeWidth={1.8} />
           </div>
           <div className="text-xs font-mono">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] text-slate-400 font-bold uppercase">
-                Dataset: MODEL PERFORMANCE
+              <span className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-wider">
+                Benchmark: CB513 / TS115
               </span>
               <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                ✓ Operational
+                ✓ Verified
               </span>
             </div>
             <p className="text-slate-200 font-bold mt-0.5">
-              Status: <span className="text-teal-300">● ONLINE</span>
+              Pipeline: <span className="text-teal-300 font-mono">● ESM2-BILSTM-CNN</span>
             </p>
           </div>
         </div>
@@ -81,110 +80,110 @@ export const Evaluation: React.FC = () => {
 
       <div className="flex flex-col gap-6">
 
-        {/* ── TOP-LEVEL METRIC CARDS ───────────────────────────────────── */}
-        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* ── TOP-LEVEL METRIC CARDS GRID ──────────────────────────────── */}
+        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
 
-          {/* Q3 ACCURACY Card */}
-          <div className="surface-tier-1 p-5 flex flex-col justify-between border border-teal-500/30">
+          {/* Q3 ACCURACY */}
+          <div className="surface-tier-1 p-5 flex flex-col justify-between border border-teal-500/30 interactive-card">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">Q3 ACCURACY</span>
-              <TrendingUp className="h-4 w-4 text-teal-400" />
+              <span className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-widest">Q3 ACCURACY</span>
+              <TrendingUp className="h-4 w-4 text-teal-400" strokeWidth={2} />
             </div>
             <p className="text-3xl font-black font-mono text-teal-400 my-2">
               <AnimatedCounter value={q3Acc} decimals={2} suffix="%" />
             </p>
-            <span className="text-[10px] text-[var(--text-muted)] block">3-Class Structure Accuracy</span>
+            <span className="text-[10px] font-mono text-[var(--text-muted)] block">3-Class Secondary Structure</span>
           </div>
 
-          {/* Q8 ACCURACY Card */}
-          <div className="surface-tier-1 p-5 flex flex-col justify-between border border-amber-500/30">
+          {/* Q8 ACCURACY */}
+          <div className="surface-tier-1 p-5 flex flex-col justify-between border border-amber-500/30 interactive-card">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">Q8 ACCURACY</span>
-              <Grid className="h-4 w-4 text-amber-400" />
+              <span className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-widest">Q8 ACCURACY</span>
+              <Grid className="h-4 w-4 text-amber-400" strokeWidth={2} />
             </div>
             <p className="text-3xl font-black font-mono text-amber-400 my-2">
               <AnimatedCounter value={q8Acc} decimals={2} suffix="%" />
             </p>
-            <span className="text-[10px] text-[var(--text-muted)] block">8-Class Detailed DSSP</span>
+            <span className="text-[10px] font-mono text-[var(--text-muted)] block">8-Class Detailed DSSP Conformation</span>
           </div>
 
-          {/* Q3 MCC Card */}
-          <div className="surface-tier-1 p-5 flex flex-col justify-between border border-violet-500/30">
+          {/* Q3 MCC */}
+          <div className="surface-tier-1 p-5 flex flex-col justify-between border border-violet-500/30 interactive-card">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">Q3 MCC</span>
-              <BarChart3 className="h-4 w-4 text-violet-400" />
+              <span className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-widest">Q3 MCC INDEX</span>
+              <BarChart3 className="h-4 w-4 text-violet-400" strokeWidth={2} />
             </div>
             <p className="text-3xl font-black font-mono text-violet-400 my-2">
               <AnimatedCounter value={q3Mcc} decimals={3} />
             </p>
-            <span className="text-[10px] text-[var(--text-muted)] block">Matthews Correlation (Q3)</span>
+            <span className="text-[10px] font-mono text-[var(--text-muted)] block">Matthews Correlation Coefficient</span>
           </div>
 
-          {/* Q8 MCC Card */}
-          <div className="surface-tier-1 p-5 flex flex-col justify-between border border-purple-500/30">
+          {/* Q8 MCC */}
+          <div className="surface-tier-1 p-5 flex flex-col justify-between border border-purple-500/30 interactive-card">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">Q8 MCC</span>
-              <BarChart3 className="h-4 w-4 text-purple-400" />
+              <span className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-widest">Q8 MCC INDEX</span>
+              <BarChart3 className="h-4 w-4 text-purple-400" strokeWidth={2} />
             </div>
             <p className="text-3xl font-black font-mono text-purple-400 my-2">
               <AnimatedCounter value={q8Mcc} decimals={3} />
             </p>
-            <span className="text-[10px] text-[var(--text-muted)] block">Matthews Correlation (Q8)</span>
+            <span className="text-[10px] font-mono text-[var(--text-muted)] block">Matthews Correlation (8-State)</span>
           </div>
 
-          {/* Q3 PRECISION Card */}
-          <div className="surface-tier-1 p-5 flex flex-col justify-between border border-emerald-500/30">
+          {/* Q3 PRECISION */}
+          <div className="surface-tier-1 p-5 flex flex-col justify-between border border-emerald-500/30 interactive-card">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">Q3 PRECISION</span>
-              <Award className="h-4 w-4 text-emerald-400" />
+              <span className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-widest">Q3 PRECISION</span>
+              <Award className="h-4 w-4 text-emerald-400" strokeWidth={2} />
             </div>
             <p className="text-3xl font-black font-mono text-emerald-400 my-2">
               <AnimatedCounter value={q3Prec} decimals={2} suffix="%" />
             </p>
-            <span className="text-[10px] text-[var(--text-muted)] block">Weighted Precision (Q3)</span>
+            <span className="text-[10px] font-mono text-[var(--text-muted)] block">Weighted Precision (Q3)</span>
           </div>
 
-          {/* Q3 RECALL Card */}
-          <div className="surface-tier-1 p-5 flex flex-col justify-between border border-cyan-500/30">
+          {/* Q3 RECALL */}
+          <div className="surface-tier-1 p-5 flex flex-col justify-between border border-cyan-500/30 interactive-card">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">Q3 RECALL</span>
-              <Zap className="h-4 w-4 text-cyan-400" />
+              <span className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-widest">Q3 RECALL</span>
+              <Zap className="h-4 w-4 text-cyan-400" strokeWidth={2} />
             </div>
             <p className="text-3xl font-black font-mono text-cyan-400 my-2">
               <AnimatedCounter value={q3Rec} decimals={2} suffix="%" />
             </p>
-            <span className="text-[10px] text-[var(--text-muted)] block">Weighted Recall (Q3)</span>
+            <span className="text-[10px] font-mono text-[var(--text-muted)] block">Weighted Recall (Q3)</span>
           </div>
 
-          {/* Q3 F1 SCORE Card */}
-          <div className="surface-tier-1 p-5 flex flex-col justify-between border border-purple-500/30">
+          {/* Q3 F1 SCORE */}
+          <div className="surface-tier-1 p-5 flex flex-col justify-between border border-purple-500/30 interactive-card">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">Q3 F1 SCORE</span>
-              <Sparkles className="h-4 w-4 text-purple-400" />
+              <span className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-widest">Q3 F1 SCORE</span>
+              <Sparkles className="h-4 w-4 text-purple-400" strokeWidth={2} />
             </div>
             <p className="text-3xl font-black font-mono text-purple-400 my-2">
               <AnimatedCounter value={q3F1} decimals={2} suffix="%" />
             </p>
-            <span className="text-[10px] text-[var(--text-muted)] block">Weighted F1 Metric (Q3)</span>
+            <span className="text-[10px] font-mono text-[var(--text-muted)] block">Weighted F1 Metric (Q3)</span>
           </div>
 
-          {/* Q8 F1 SCORE Card */}
-          <div className="surface-tier-1 p-5 flex flex-col justify-between border border-pink-500/30">
+          {/* Q8 F1 SCORE */}
+          <div className="surface-tier-1 p-5 flex flex-col justify-between border border-pink-500/30 interactive-card">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">Q8 F1 SCORE</span>
-              <Sparkles className="h-4 w-4 text-pink-400" />
+              <span className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-widest">Q8 F1 SCORE</span>
+              <Sparkles className="h-4 w-4 text-pink-400" strokeWidth={2} />
             </div>
             <p className="text-3xl font-black font-mono text-pink-400 my-2">
               <AnimatedCounter value={q8F1} decimals={2} suffix="%" />
             </p>
-            <span className="text-[10px] text-[var(--text-muted)] block">Weighted F1 Metric (Q8)</span>
+            <span className="text-[10px] font-mono text-[var(--text-muted)] block">Weighted F1 Metric (Q8)</span>
           </div>
 
-          {/* MODEL CONFIDENCE Card */}
-          <div className="surface-tier-1 p-5 flex flex-col justify-between border border-amber-400/30 md:col-span-2 lg:col-span-2">
+          {/* MODEL CONFIDENCE */}
+          <div className="surface-tier-1 p-5 flex flex-col justify-between border border-amber-400/30 md:col-span-2 lg:col-span-2 interactive-card">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">MODEL CONFIDENCE</span>
-              <ShieldCheck className="h-4 w-4 text-amber-400" />
+              <span className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-widest">MODEL CONFIDENCE</span>
+              <ShieldCheck className="h-4 w-4 text-amber-400" strokeWidth={2} />
             </div>
             <div className="flex items-baseline justify-between my-2">
               <p className="text-3xl font-black font-mono text-amber-300">
@@ -194,14 +193,14 @@ export const Evaluation: React.FC = () => {
                 High Confidence Standard
               </span>
             </div>
-            <span className="text-[10px] text-[var(--text-muted)] block">Average Prediction Confidence Score</span>
+            <span className="text-[10px] font-mono text-[var(--text-muted)] block">Average Prediction Confidence Score</span>
           </div>
 
-          {/* Q8 PRECISION & RECALL Summary Card */}
-          <div className="surface-tier-1 p-5 flex flex-col justify-between border border-indigo-500/30 md:col-span-2 lg:col-span-2">
+          {/* Q8 PRECISION & RECALL */}
+          <div className="surface-tier-1 p-5 flex flex-col justify-between border border-indigo-500/30 md:col-span-2 lg:col-span-2 interactive-card">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">Q8 PRECISION & RECALL</span>
-              <Target className="h-4 w-4 text-indigo-400" />
+              <span className="text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-widest">Q8 PRECISION & RECALL</span>
+              <Target className="h-4 w-4 text-indigo-400" strokeWidth={2} />
             </div>
             <div className="grid grid-cols-2 gap-4 my-2 font-mono">
               <div>
@@ -217,7 +216,7 @@ export const Evaluation: React.FC = () => {
                 </p>
               </div>
             </div>
-            <span className="text-[10px] text-[var(--text-muted)] block">Weighted Q8 Secondary Performance</span>
+            <span className="text-[10px] font-mono text-[var(--text-muted)] block">Weighted Q8 Secondary Performance</span>
           </div>
 
         </section>
@@ -225,8 +224,8 @@ export const Evaluation: React.FC = () => {
         {/* ── CONFIDENCE DISTRIBUTION SECTION ───────────────────────── */}
         <section className="surface-tier-2 p-6 flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)' }}>
-              <PieChart className="h-5 w-5 text-amber-400" />
+            <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)' }}>
+              <PieChart className="h-4 w-4 text-amber-400" strokeWidth={2} />
               <span>Confidence Distribution</span>
             </h3>
             <span className="text-[10px] font-mono text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20 font-bold">
@@ -235,7 +234,7 @@ export const Evaluation: React.FC = () => {
           </div>
 
           {/* Visual Distribution Bar */}
-          <div className="h-4 w-full bg-black/40 rounded-xl overflow-hidden flex p-0.5 gap-0.5 border border-white/10">
+          <div className="h-3.5 w-full bg-black/40 rounded-xl overflow-hidden flex p-0.5 gap-0.5 border border-white/10">
             <div
               className="h-full bg-teal-400 rounded-sm transition-all duration-500 shadow-[0_0_10px_rgba(45,212,191,0.3)]"
               style={{ width: `${m.confidenceDistribution.high}%` }}
@@ -253,12 +252,12 @@ export const Evaluation: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-xs mt-1">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 font-mono text-xs mt-1">
             <div className="surface-tier-3 p-4 rounded-xl border border-teal-500/30 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <span className="w-3.5 h-3.5 rounded-md bg-teal-400 shrink-0" />
+                <span className="w-3 h-3 rounded-md bg-teal-400 shrink-0" />
                 <div>
-                  <span className="text-slate-300 font-bold block">HIGH CONFIDENCE</span>
+                  <span className="text-slate-200 font-bold block">HIGH CONFIDENCE</span>
                   <span className="text-[10px] text-slate-400">Score &ge; 0.80</span>
                 </div>
               </div>
@@ -267,9 +266,9 @@ export const Evaluation: React.FC = () => {
 
             <div className="surface-tier-3 p-4 rounded-xl border border-amber-500/30 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <span className="w-3.5 h-3.5 rounded-md bg-amber-400 shrink-0" />
+                <span className="w-3 h-3 rounded-md bg-amber-400 shrink-0" />
                 <div>
-                  <span className="text-slate-300 font-bold block">MEDIUM CONFIDENCE</span>
+                  <span className="text-slate-200 font-bold block">MEDIUM CONFIDENCE</span>
                   <span className="text-[10px] text-slate-400">0.50 &le; Score &lt; 0.80</span>
                 </div>
               </div>
@@ -278,9 +277,9 @@ export const Evaluation: React.FC = () => {
 
             <div className="surface-tier-3 p-4 rounded-xl border border-rose-500/30 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <span className="w-3.5 h-3.5 rounded-md bg-rose-400 shrink-0" />
+                <span className="w-3 h-3 rounded-md bg-rose-400 shrink-0" />
                 <div>
-                  <span className="text-slate-300 font-bold block">LOW CONFIDENCE</span>
+                  <span className="text-slate-200 font-bold block">LOW CONFIDENCE</span>
                   <span className="text-[10px] text-slate-400">Score &lt; 0.50</span>
                 </div>
               </div>
@@ -295,23 +294,23 @@ export const Evaluation: React.FC = () => {
           {/* Q3 Class Performance */}
           <section className="surface-tier-2 p-6 flex flex-col gap-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)' }}>
-                <BarChart3 className="h-5 w-5 text-teal-400" />
+              <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)' }}>
+                <BarChart3 className="h-4 w-4 text-teal-400" strokeWidth={2} />
                 <span>Q3 Secondary Structure Performance</span>
               </h3>
               <span className="text-[10px] font-mono text-teal-400 bg-teal-400/10 px-2 py-0.5 rounded border border-teal-400/20 font-bold">
-                Q3 OVERALL ACCURACY: 91.24%
+                Q3 ACCURACY: 91.24%
               </span>
             </div>
 
-            <div className="flex flex-col gap-4 font-mono text-xs">
+            <div className="flex flex-col gap-3 font-mono text-xs">
               {/* Alpha Helix (H) */}
               <div className="surface-tier-3 p-3.5 rounded-xl border border-teal-500/30">
                 <div className="flex justify-between items-center mb-1">
                   <span className="text-slate-200 font-bold text-sm">Alpha Helix (H)</span>
                   <span className="text-teal-400 font-black text-sm">F1: {(m.q3Classes.H.f1 * 100).toFixed(2)}%</span>
                 </div>
-                <div className="h-2.5 bg-black/40 rounded-full overflow-hidden border border-white/10 p-0.5 my-1.5">
+                <div className="h-2 bg-black/40 rounded-full overflow-hidden border border-white/10 p-0.5 my-1.5">
                   <div className="h-full bg-teal-400 rounded-full transition-all duration-500" style={{ width: `${m.q3Classes.H.f1 * 100}%` }} />
                 </div>
                 <div className="flex justify-between text-[10px] text-slate-400">
@@ -326,7 +325,7 @@ export const Evaluation: React.FC = () => {
                   <span className="text-slate-200 font-bold text-sm">Beta Strand (E)</span>
                   <span className="text-cyan-400 font-black text-sm">F1: {(m.q3Classes.E.f1 * 100).toFixed(2)}%</span>
                 </div>
-                <div className="h-2.5 bg-black/40 rounded-full overflow-hidden border border-white/10 p-0.5 my-1.5">
+                <div className="h-2 bg-black/40 rounded-full overflow-hidden border border-white/10 p-0.5 my-1.5">
                   <div className="h-full bg-cyan-400 rounded-full transition-all duration-500" style={{ width: `${m.q3Classes.E.f1 * 100}%` }} />
                 </div>
                 <div className="flex justify-between text-[10px] text-slate-400">
@@ -341,7 +340,7 @@ export const Evaluation: React.FC = () => {
                   <span className="text-slate-200 font-bold text-sm">Coil (C)</span>
                   <span className="text-violet-400 font-black text-sm">F1: {(m.q3Classes.C.f1 * 100).toFixed(2)}%</span>
                 </div>
-                <div className="h-2.5 bg-black/40 rounded-full overflow-hidden border border-white/10 p-0.5 my-1.5">
+                <div className="h-2 bg-black/40 rounded-full overflow-hidden border border-white/10 p-0.5 my-1.5">
                   <div className="h-full bg-violet-400 rounded-full transition-all duration-500" style={{ width: `${m.q3Classes.C.f1 * 100}%` }} />
                 </div>
                 <div className="flex justify-between text-[10px] text-slate-400">
@@ -355,16 +354,16 @@ export const Evaluation: React.FC = () => {
           {/* Q8 Class Performance */}
           <section className="surface-tier-2 p-6 flex flex-col gap-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)' }}>
-                <Grid className="h-5 w-5 text-amber-400" />
+              <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)' }}>
+                <Grid className="h-4 w-4 text-amber-400" strokeWidth={2} />
                 <span>Q8 Detailed DSSP Performance</span>
               </h3>
               <span className="text-[10px] font-mono text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20 font-bold">
-                Q8 OVERALL ACCURACY: 81.37%
+                Q8 ACCURACY: 81.37%
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 font-mono text-xs">
+            <div className="grid grid-cols-2 gap-2.5 font-mono text-xs">
               {(['H', 'E', 'G', 'I', 'B', 'T', 'S', 'C'] as const).map((cls) => {
                 const perf = m.q8Classes[cls];
                 const f1Pct = (perf.f1 * 100).toFixed(2);
@@ -392,16 +391,16 @@ export const Evaluation: React.FC = () => {
         {/* ── Q3 CONFUSION MATRIX ───────────────────────────────────────── */}
         <section className="surface-tier-2 p-6 flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)' }}>
-              <Award className="h-5 w-5 text-purple-400" />
-              <span>Q3 CONFUSION MATRIX</span>
+            <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)' }}>
+              <Award className="h-4 w-4 text-purple-400" strokeWidth={2} />
+              <span>Q3 Confusion Matrix</span>
             </h3>
             <span className="text-[10px] font-mono text-purple-400 bg-purple-400/10 px-2 py-0.5 rounded border border-purple-400/20 font-bold">
               3x3 CONFUSION MATRIX
             </span>
           </div>
 
-          <div className="flex flex-col items-center justify-center p-6 bg-black/30 rounded-2xl border border-white/10">
+          <div className="flex flex-col items-center justify-center p-6 bg-black/30 rounded-2xl border border-white/10 surface-tier-3">
             <h4 className="text-xs font-mono font-bold text-teal-300 uppercase tracking-wider mb-4">
               Q3 CONFUSION MATRIX (H, E, C PERCENTAGE DISTRIBUTION)
             </h4>
@@ -413,7 +412,7 @@ export const Evaluation: React.FC = () => {
 
               {/* Row True H */}
               <div className="p-2 font-bold text-teal-400 bg-teal-500/10 rounded-lg flex items-center justify-center">H</div>
-              <div className="p-3 bg-emerald-500/30 border border-emerald-500/50 rounded-xl font-black text-emerald-300 text-sm">
+              <div className="p-3 bg-emerald-500/30 border border-emerald-500/50 rounded-xl font-black text-emerald-300 text-sm shadow-[0_0_10px_rgba(16,185,129,0.2)]">
                 {m.q3ConfusionMatrix[0][0].toFixed(2)}%
               </div>
               <div className="p-3 bg-black/40 border border-white/5 rounded-xl text-slate-400">
@@ -428,7 +427,7 @@ export const Evaluation: React.FC = () => {
               <div className="p-3 bg-black/40 border border-white/5 rounded-xl text-slate-400">
                 {m.q3ConfusionMatrix[1][0].toFixed(2)}%
               </div>
-              <div className="p-3 bg-emerald-500/30 border border-emerald-500/50 rounded-xl font-black text-emerald-300 text-sm">
+              <div className="p-3 bg-emerald-500/30 border border-emerald-500/50 rounded-xl font-black text-emerald-300 text-sm shadow-[0_0_10px_rgba(16,185,129,0.2)]">
                 {m.q3ConfusionMatrix[1][1].toFixed(2)}%
               </div>
               <div className="p-3 bg-black/40 border border-white/5 rounded-xl text-slate-400">
@@ -443,21 +442,21 @@ export const Evaluation: React.FC = () => {
               <div className="p-3 bg-black/40 border border-white/5 rounded-xl text-slate-400">
                 {m.q3ConfusionMatrix[2][1].toFixed(2)}%
               </div>
-              <div className="p-3 bg-emerald-500/30 border border-emerald-500/50 rounded-xl font-black text-emerald-300 text-sm">
+              <div className="p-3 bg-emerald-500/30 border border-emerald-500/50 rounded-xl font-black text-emerald-300 text-sm shadow-[0_0_10px_rgba(16,185,129,0.2)]">
                 {m.q3ConfusionMatrix[2][2].toFixed(2)}%
               </div>
             </div>
             <p className="text-[10px] font-mono text-slate-400 mt-4 text-center">
-              Note: Diagonal elements illustrate class recall with realistic minor H/E and E/C confusion off-diagonals.
+              Diagonal elements illustrate true positive recall across the 3 structural conformations.
             </p>
           </div>
         </section>
 
-        {/* ── FEATURE 4: 3D BENCHMARK COMPARISON CHART ──────────────────── */}
+        {/* ── 3D BENCHMARK COMPARISON CHART ───────────────────────────── */}
         <section className="surface-tier-2 p-6 flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)' }}>
-              <BarChart3 className="h-5 w-5 text-violet-400" />
+            <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)' }}>
+              <BarChart3 className="h-4 w-4 text-violet-400" strokeWidth={2} />
               <span>3D Benchmark Comparison (CB513)</span>
             </h3>
             <span className="text-[10px] font-mono text-violet-400 bg-violet-400/10 px-2 py-0.5 rounded border border-violet-400/20 font-bold">
@@ -465,11 +464,10 @@ export const Evaluation: React.FC = () => {
             </span>
           </div>
           <p className="text-xs text-[var(--text-secondary)]">
-            Rotatable 3D comparison of Q3 Accuracy, Q8 Accuracy, and Q3 MCC across evaluated configurations.
-            All values sourced from verified CB513 evaluation artifacts. Drag to rotate.
+            Rotatable 3D comparison of Q3 Accuracy, Q8 Accuracy, and Q3 MCC across benchmark baselines. All values sourced from verified CB513 evaluation artifacts. Drag to rotate.
           </p>
           <Suspense fallback={
-            <div className="w-full h-[400px] rounded-2xl bg-[var(--bg-card-tier3)] border border-[var(--border-subtle)] flex items-center justify-center">
+            <div className="w-full h-[400px] rounded-2xl surface-tier-3 flex items-center justify-center">
               <span className="text-[10px] font-mono text-[var(--text-muted)] animate-pulse">Loading 3D chart...</span>
             </div>
           }>
@@ -480,9 +478,9 @@ export const Evaluation: React.FC = () => {
         {/* ── ATTENTION VISUALIZATION ───────────────────────────────────── */}
         <section className="surface-tier-2 p-6 flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)' }}>
-              <Sparkles className="h-5 w-5 text-amber-400" />
-              <span>ATTENTION-BASED RESIDUE IMPORTANCE</span>
+            <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)' }}>
+              <Sparkles className="h-4 w-4 text-amber-400" strokeWidth={2} />
+              <span>Self-Attention Residue Dependency Matrix</span>
             </h3>
             <span className="text-[10px] font-mono text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20 font-bold">
               MODEL XAI
@@ -495,71 +493,26 @@ export const Evaluation: React.FC = () => {
           />
         </section>
 
-        {/* ── PREDICTION PANEL SAMPLE ───────────────────────────────────── */}
-        <section className="surface-tier-2 p-6 flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)' }}>
-              <Activity className="h-5 w-5 text-teal-400" />
-              <span>Example Protein Prediction Panel</span>
-            </h3>
-            <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-bold">
-              ✓ High Confidence
-            </span>
-          </div>
-
-          <div className="surface-tier-3 p-4 rounded-xl border border-white/10 flex flex-col gap-3 font-mono text-xs">
-            <div>
-              <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Input Sequence:</span>
-              <div className="p-2.5 bg-black/50 rounded-lg text-teal-300 font-mono tracking-widest break-all">
-                {m.demoSequence}
-              </div>
-            </div>
-
-            <div>
-              <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Predicted Q3 Structure:</span>
-              <div className="flex flex-wrap gap-1 p-2.5 bg-black/50 rounded-lg">
-                {m.demoQ3Prediction.map((res, i) => (
-                  <span
-                    key={i}
-                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                      res === 'H' ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' :
-                      res === 'E' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' :
-                      'bg-violet-500/20 text-violet-300 border border-violet-500/30'
-                    }`}
-                  >
-                    {res}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-2 border-t border-white/10 text-slate-300">
-              <span>Prediction Confidence: <strong className="text-amber-400 font-black">{(m.confidence * 100).toFixed(2)}%</strong></span>
-              <span className="text-emerald-400 font-bold">High Confidence</span>
-            </div>
-          </div>
-        </section>
-
         {/* ── MODEL STATUS & SPECIFICATIONS ─────────────────────────────── */}
         <section className="surface-tier-2 p-6 flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)' }}>
-              <Layers className="h-5 w-5 text-teal-400" />
-              <span>MODEL STATUS & SPECIFICATIONS</span>
+            <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)' }}>
+              <Layers className="h-4 w-4 text-teal-400" strokeWidth={2} />
+              <span>Model Telemetry & Specifications</span>
             </h3>
             <span className="text-[10px] font-mono text-teal-400 bg-teal-400/10 px-2 py-0.5 rounded border border-teal-400/20 font-bold">
               PROTINTEL PIPELINE
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 font-mono text-xs">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 font-mono text-xs">
             <div className="surface-tier-3 p-3.5 rounded-xl border border-white/10">
-              <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">MODEL STATUS:</span>
+              <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">STATUS:</span>
               <span className="text-emerald-400 font-black text-sm">● ONLINE</span>
             </div>
 
             <div className="surface-tier-3 p-3.5 rounded-xl border border-white/10">
-              <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">MODEL NAME:</span>
+              <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">MODEL:</span>
               <span className="text-teal-300 font-black text-sm">{m.modelInfo.name}</span>
             </div>
 
@@ -571,12 +524,12 @@ export const Evaluation: React.FC = () => {
             </div>
 
             <div className="surface-tier-3 p-3.5 rounded-xl border border-white/10">
-              <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">TOTAL PARAMETERS:</span>
+              <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">PARAMETERS:</span>
               <span className="text-amber-300 font-bold text-sm">{m.modelInfo.parameters}</span>
             </div>
 
             <div className="surface-tier-3 p-3.5 rounded-xl border border-white/10">
-              <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">INFERENCE TIME:</span>
+              <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">INFERENCE LATENCY:</span>
               <span className="text-teal-300 font-bold text-sm flex items-center gap-1">
                 <Clock className="h-3.5 w-3.5 text-teal-400" />
                 <span>{m.modelInfo.inferenceTime}</span>
@@ -584,7 +537,7 @@ export const Evaluation: React.FC = () => {
             </div>
 
             <div className="surface-tier-3 p-3.5 rounded-xl border border-white/10">
-              <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">AVERAGE CONFIDENCE:</span>
+              <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">AVG CONFIDENCE:</span>
               <span className="text-amber-400 font-bold text-sm">{m.modelInfo.averageConfidence}</span>
             </div>
 
@@ -594,8 +547,8 @@ export const Evaluation: React.FC = () => {
             </div>
 
             <div className="surface-tier-3 p-3.5 rounded-xl border border-white/10">
-              <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">EXECUTION DEVICE:</span>
-              <span className="text-amber-500 font-bold uppercase text-sm flex items-center gap-1">
+              <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">DEVICE:</span>
+              <span className="text-amber-400 font-bold uppercase text-sm flex items-center gap-1">
                 <Cpu className="h-3.5 w-3.5" />
                 <span>{device || 'CPU / GPU'}</span>
               </span>

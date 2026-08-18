@@ -107,24 +107,31 @@ export const Batch: React.FC = () => {
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Form */}
+        {/* Left: Configuration Form */}
         <div className="lg:col-span-1">
-          <section className="surface-tier-2 p-6">
-            <h3 className="text-base font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)' }}>
-              <Database className="h-5 w-5 text-violet-400" />
-              <span>Batch Configuration</span>
-            </h3>
+          <section className="surface-tier-2 p-6 flex flex-col gap-5 relative overflow-hidden">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2.5" style={{ fontFamily: 'var(--font-heading)' }}>
+                <div className="p-2 rounded-xl bg-purple-500/15 border border-purple-500/30">
+                  <Database className="h-4 w-4 text-violet-400" strokeWidth={1.8} />
+                </div>
+                <span>Batch Configuration</span>
+              </h3>
+              <span className="text-[10px] font-mono font-bold text-violet-400 bg-violet-400/10 px-2 py-0.5 rounded border border-violet-400/20">
+                MAX 50 SEQS
+              </span>
+            </div>
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div>
-                <label className="block text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">
+                <label className="block text-[10px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5">
                   Multi-Sequence Input (FASTA or Line List)
                 </label>
                 <textarea
                   value={inputData}
                   onChange={handleTextareaChange}
                   placeholder={">Seq1\nMKFLILLFNILCLFPVLA\n>Seq2\nMGGKFVLLASILFP"}
-                  className="w-full h-56 bg-[var(--bg-card-tier3)] border border-[var(--border-subtle)] rounded-2xl p-4 text-xs font-mono text-[var(--text-primary)] placeholder-slate-600 focus:outline-none focus:border-teal-400 resize-none transition-all"
+                  className="instrument-input w-full h-52 p-3.5 text-xs font-mono resize-none"
                   required
                 />
               </div>
@@ -138,18 +145,18 @@ export const Batch: React.FC = () => {
                     role="switch"
                     aria-checked={returnAttention}
                     onClick={() => setReturnAttention(!returnAttention)}
-                    className="relative flex-shrink-0"
+                    className="relative flex-shrink-0 transition-colors"
                     style={{
                       width: 36, height: 20, borderRadius: 10, cursor: 'pointer',
-                      background: returnAttention ? 'linear-gradient(135deg, #7B2FF7, #00D9C0)' : 'rgba(255,255,255,0.08)',
+                      background: returnAttention ? 'linear-gradient(135deg, var(--aurora-violet), var(--aurora-teal))' : 'rgba(255,255,255,0.08)',
                       border: `1px solid ${returnAttention ? 'rgba(0,217,192,0.5)' : 'var(--border-muted)'}`,
                     }}
                   >
                     <span
-                      className="absolute top-[2px]"
+                      className="absolute top-[2px] transition-all duration-200"
                       style={{
                         width: 14, height: 14, borderRadius: '50%', background: '#fff',
-                        left: returnAttention ? 18 : 2, transition: 'left 0.2s ease',
+                        left: returnAttention ? 18 : 2,
                       }}
                     />
                   </button>
@@ -162,18 +169,18 @@ export const Batch: React.FC = () => {
                     role="switch"
                     aria-checked={returnXai}
                     onClick={() => setReturnXai(!returnXai)}
-                    className="relative flex-shrink-0"
+                    className="relative flex-shrink-0 transition-colors"
                     style={{
                       width: 36, height: 20, borderRadius: 10, cursor: 'pointer',
-                      background: returnXai ? 'linear-gradient(135deg, #7B2FF7, #00D9C0)' : 'rgba(255,255,255,0.08)',
+                      background: returnXai ? 'linear-gradient(135deg, var(--aurora-violet), var(--aurora-teal))' : 'rgba(255,255,255,0.08)',
                       border: `1px solid ${returnXai ? 'rgba(0,217,192,0.5)' : 'var(--border-muted)'}`,
                     }}
                   >
                     <span
-                      className="absolute top-[2px]"
+                      className="absolute top-[2px] transition-all duration-200"
                       style={{
                         width: 14, height: 14, borderRadius: '50%', background: '#fff',
-                        left: returnXai ? 18 : 2, transition: 'left 0.2s ease',
+                        left: returnXai ? 18 : 2,
                       }}
                     />
                   </button>
@@ -181,13 +188,13 @@ export const Batch: React.FC = () => {
 
                 {returnXai && (
                   <div className="mt-2 pt-2 border-t border-[var(--border-subtle)]">
-                    <label className="block text-[10px] font-mono font-bold text-amber-400 uppercase tracking-wider mb-1">
+                    <label className="block text-[10px] font-mono font-bold text-amber-400 uppercase tracking-wider mb-1.5">
                       XAI Method
                     </label>
                     <select
                       value={xaiMethod}
                       onChange={(e: any) => setXaiMethod(e.target.value)}
-                      className="w-full bg-[var(--bg-card-tier3)] border border-[var(--border-subtle)] rounded-xl px-3 py-1.5 text-xs font-mono text-[var(--text-primary)] focus:outline-none"
+                      className="instrument-select w-full px-3 py-1.5"
                     >
                       <option value="ig">Integrated Gradients (IG)</option>
                       <option value="shap">Gradient SHAP</option>
@@ -198,7 +205,7 @@ export const Batch: React.FC = () => {
               </div>
 
               {(validationError || batchError) && (
-                <div className="bg-rose-500/10 border border-rose-500/20 text-rose-300 p-3.5 rounded-2xl text-xs flex items-start gap-2">
+                <div className="bg-rose-500/10 border border-rose-500/25 text-rose-300 p-3.5 rounded-xl text-xs flex items-start gap-2 backdrop-blur-sm">
                   <AlertCircle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
                   <span>{validationError || batchError}</span>
                 </div>
@@ -207,18 +214,12 @@ export const Batch: React.FC = () => {
               <button
                 type="submit"
                 disabled={isBatchPredicting || !modelLoaded}
-                className="w-full font-bold text-sm py-3 rounded-2xl text-white flex items-center justify-center gap-2 transition-all cursor-pointer"
-                style={{
-                  fontFamily: 'var(--font-heading)',
-                  background: isBatchPredicting || !modelLoaded ? 'var(--bg-card-tier3)' : 'linear-gradient(135deg, var(--aurora-violet) 0%, var(--aurora-teal) 100%)',
-                  boxShadow: isBatchPredicting || !modelLoaded ? 'none' : '0 4px 20px rgba(123,47,247,0.3)',
-                  color: isBatchPredicting || !modelLoaded ? 'var(--text-muted)' : '#fff',
-                }}
+                className="btn-primary-action w-full py-3.5 flex items-center justify-center gap-2.5 text-sm cursor-pointer shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isBatchPredicting ? (
                   <>
                     <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    <span className="font-mono text-xs">Processing Batch...</span>
+                    <span className="font-mono text-xs animate-pulse">Processing Batch...</span>
                   </>
                 ) : (
                   <>
@@ -231,13 +232,13 @@ export const Batch: React.FC = () => {
           </section>
         </div>
 
-        {/* Right Output Table */}
+        {/* Right: Output Results Table */}
         <div className="lg:col-span-2">
-          <section className="surface-tier-2 p-6 flex flex-col h-full min-h-[500px]">
-            <div className="flex items-center justify-between mb-4">
+          <section className="surface-tier-2 p-6 flex flex-col h-full min-h-[520px]">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
               <div>
-                <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)' }}>
-                  <FileText className="h-5 w-5 text-teal-400" />
+                <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)' }}>
+                  <FileText className="h-4 w-4 text-teal-400" strokeWidth={2} />
                   <span>Batch Output Results</span>
                 </h3>
                 <p className="text-xs text-[var(--text-secondary)] mt-0.5">High-throughput sequence predictions and structural ratios</p>
@@ -256,34 +257,36 @@ export const Batch: React.FC = () => {
 
             {batchResults ? (
               <div className="flex flex-col gap-4">
-                <div className="flex gap-4 p-4 rounded-2xl surface-tier-3 font-mono text-xs">
+                {/* Stats Header Bar */}
+                <div className="grid grid-cols-3 gap-3 p-4 rounded-xl surface-tier-3 font-mono text-xs border border-teal-500/20">
                   <div>
-                    <span className="text-[10px] text-[var(--text-muted)] uppercase block">Total Batch</span>
-                    <span className="text-base font-bold text-teal-400">
+                    <span className="text-[9px] text-[var(--text-muted)] font-bold uppercase tracking-wider block">Total Batch</span>
+                    <span className="text-lg font-black text-teal-400">
                       <AnimatedCounter value={batchResults.total_sequences} />
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-[var(--text-muted)] uppercase block">Successful</span>
-                    <span className="text-base font-bold text-emerald-400">
+                    <span className="text-[9px] text-[var(--text-muted)] font-bold uppercase tracking-wider block">Successful</span>
+                    <span className="text-lg font-black text-emerald-400">
                       <AnimatedCounter value={batchResults.results.length} />
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-[var(--text-muted)] uppercase block">Total Time</span>
-                    <span className="text-base font-bold text-amber-400">
+                    <span className="text-[9px] text-[var(--text-muted)] font-bold uppercase tracking-wider block">Total Time</span>
+                    <span className="text-lg font-black text-amber-400">
                       <AnimatedCounter value={batchResults.total_processing_time_ms} suffix=" ms" />
                     </span>
                   </div>
                 </div>
 
-                <div className="overflow-x-auto rounded-2xl border border-[var(--border-subtle)]">
+                {/* Table */}
+                <div className="overflow-x-auto rounded-xl border border-[var(--border-muted)] surface-tier-3">
                   <table className="w-full text-left text-xs font-mono">
-                    <thead className="bg-[var(--bg-card-tier3)] text-[var(--text-muted)] font-bold uppercase border-b border-[var(--border-subtle)]">
+                    <thead className="bg-[var(--glass-tier3)] text-[var(--text-muted)] font-bold uppercase border-b border-[var(--border-muted)] text-[10px] tracking-wider">
                       <tr>
                         <th className="p-3">ID</th>
                         <th className="p-3">Length</th>
-                        <th className="p-3">Q3 Ratio</th>
+                        <th className="p-3">Q3 Composition</th>
                         <th className="p-3">Avg Conf</th>
                         <th className="p-3 text-right">Action</th>
                       </tr>
@@ -292,15 +295,15 @@ export const Batch: React.FC = () => {
                       {batchResults.results.map((res: any) => {
                         const avgConf = (res.confidence.reduce((a: number, b: number) => a + b, 0) / res.length * 100);
                         return (
-                          <tr key={res.protein_id} className="hover:bg-[var(--border-subtle)]/50 transition-colors">
+                          <tr key={res.protein_id} className="hover:bg-[var(--glass-interactive-hover)] transition-colors">
                             <td className="p-3 font-bold text-[var(--text-primary)]">{res.protein_id}</td>
                             <td className="p-3 text-[var(--text-secondary)]">{res.length} aa</td>
-                            <td className="p-3 text-teal-400">{getQ3CountsStr(res.q3_prediction)}</td>
-                            <td className="p-3 text-amber-400">{avgConf.toFixed(1)}%</td>
+                            <td className="p-3 text-teal-400 font-semibold">{getQ3CountsStr(res.q3_prediction)}</td>
+                            <td className="p-3 text-amber-400 font-bold">{avgConf.toFixed(1)}%</td>
                             <td className="p-3 text-right">
                               <button
                                 onClick={() => handleOpenInPredictor(res)}
-                                className="inline-flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300 font-bold cursor-pointer"
+                                className="inline-flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300 font-bold cursor-pointer transition-colors"
                               >
                                 <span>Inspect</span>
                                 <ExternalLink className="h-3 w-3" />
@@ -314,13 +317,13 @@ export const Batch: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-                <Database className="h-10 w-10 text-[var(--text-muted)] mb-3 opacity-50" />
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-8 surface-tier-3 rounded-2xl border-dashed">
+                <Database className="h-10 w-10 text-[var(--text-muted)] mb-3 opacity-40 animate-pulse" strokeWidth={1.5} />
                 <h4 className="text-sm font-bold text-[var(--text-secondary)]" style={{ fontFamily: 'var(--font-heading)' }}>
                   Awaiting Batch Submission
                 </h4>
-                <p className="text-xs text-[var(--text-muted)] mt-1 max-w-xs">
-                  Enter multi-sequence input in the configuration panel to execute batch inference.
+                <p className="text-xs text-[var(--text-muted)] font-mono mt-1 max-w-xs">
+                  Enter multi-sequence FASTA in the configuration console to run batch inference.
                 </p>
               </div>
             )}

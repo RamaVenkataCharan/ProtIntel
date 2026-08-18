@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useThemeStore } from '../store/useThemeStore';
 import {
-  Search, Layers, Activity, Database, BarChart3, Sun, Moon, HelpCircle, X
+  Search, Layers, Activity, Database, BarChart3, Sun, Moon, HelpCircle, X, ArrowRight
 } from 'lucide-react';
 
 interface CommandPaletteProps {
@@ -26,6 +27,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     {
       id: 'nav-dashboard',
       label: 'Go to Dashboard',
+      subtitle: 'Overview & Model Metrics Summary',
       category: 'Navigation',
       icon: Layers,
       action: () => { navigate('/'); onClose(); }
@@ -33,6 +35,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     {
       id: 'nav-predictor',
       label: 'Go to Predictor',
+      subtitle: '3D Folding, Q3/Q8 & XAI Attributions',
       category: 'Navigation',
       icon: Activity,
       action: () => { navigate('/predict'); onClose(); }
@@ -40,6 +43,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     {
       id: 'nav-batch',
       label: 'Go to Batch Mode',
+      subtitle: 'High-throughput FASTA Processing',
       category: 'Navigation',
       icon: Database,
       action: () => { navigate('/batch'); onClose(); }
@@ -47,6 +51,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     {
       id: 'nav-metrics',
       label: 'Go to Metrics / Evaluation',
+      subtitle: 'Confusion Matrices & Benchmarks',
       category: 'Navigation',
       icon: BarChart3,
       action: () => { navigate('/evaluation'); onClose(); }
@@ -54,6 +59,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     {
       id: 'action-theme',
       label: `Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`,
+      subtitle: 'Toggle UI Color Scheme',
       category: 'Settings',
       icon: theme === 'dark' ? Sun : Moon,
       action: () => { toggleTheme(); onClose(); }
@@ -61,6 +67,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     {
       id: 'action-shortcuts',
       label: 'Show Keyboard Shortcuts Guide',
+      subtitle: 'Hotkeys for Navigation & Controls',
       category: 'Help',
       icon: HelpCircle,
       action: () => {
@@ -72,6 +79,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
   const filteredActions = actions.filter((act) =>
     act.label.toLowerCase().includes(query.toLowerCase()) ||
+    act.subtitle.toLowerCase().includes(query.toLowerCase()) ||
     act.category.toLowerCase().includes(query.toLowerCase())
   );
 
@@ -105,88 +113,115 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-md flex items-start justify-center pt-24 px-4 animate-fade-in"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-xl bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-spring-up"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={handleKeyDown}
-      >
-        {/* Search Header */}
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]">
-          <Search className="h-5 w-5 text-violet-400 shrink-0" />
-          <input
-            ref={inputRef}
-            type="text"
-            placeholder="Type a command or search (e.g. Predictor, Theme)..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="w-full bg-transparent text-sm font-mono text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none"
-          />
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-xl hover:bg-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all"
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
+          className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-md flex items-start justify-center pt-24 px-4"
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96, y: -8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: -8 }}
+            transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+            className="w-full max-w-xl surface-tier-1 overflow-hidden flex flex-col border border-[var(--border-prominent)]"
+            style={{
+              boxShadow: '0 24px 64px -12px rgba(0, 0, 0, 0.8), 0 0 32px var(--aurora-violet-glow), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={handleKeyDown}
           >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Command List */}
-        <div className="max-h-80 overflow-y-auto p-3 flex flex-col gap-1">
-          {filteredActions.length > 0 ? (
-            filteredActions.map((item, idx) => {
-              const Icon = item.icon;
-              const isSelected = idx === selectedIndex;
-              return (
-                <button
-                  key={item.id}
-                  onClick={item.action}
-                  onMouseEnter={() => setSelectedIndex(idx)}
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-mono transition-all text-left cursor-pointer ${
-                    isSelected
-                      ? 'bg-[var(--aurora-violet)]/15 border border-[var(--aurora-violet)]/40 text-[var(--text-primary)] shadow-md'
-                      : 'text-[var(--text-secondary)] hover:bg-[var(--border-subtle)] border border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-xl ${isSelected ? 'bg-violet-500/20 text-violet-300' : 'bg-black/20 text-[var(--text-muted)]'}`}>
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <span className="font-bold block text-xs">{item.label}</span>
-                      <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">{item.category}</span>
-                    </div>
-                  </div>
-                  {isSelected && (
-                    <span className="text-[10px] font-bold text-violet-400 bg-violet-400/10 px-2 py-0.5 rounded border border-violet-400/20">
-                      Press ↵
-                    </span>
-                  )}
-                </button>
-              );
-            })
-          ) : (
-            <div className="p-8 text-center text-xs font-mono text-[var(--text-muted)]">
-              No matching commands found.
+            {/* Search Input Header */}
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--border-muted)] bg-[var(--glass-tier2)]">
+              <Search className="h-4 w-4 text-[var(--aurora-teal)] shrink-0" strokeWidth={2} />
+              <input
+                ref={inputRef}
+                type="text"
+                placeholder="Search commands, views, or actions (e.g. Predict, Theme)..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="w-full bg-transparent text-sm font-mono text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none"
+              />
+              <button
+                onClick={onClose}
+                className="p-1 rounded-lg hover:bg-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
-          )}
-        </div>
 
-        {/* Footer Hint */}
-        <div className="px-5 py-3 border-t border-[var(--border-subtle)] bg-[var(--bg-card-tier3)] flex items-center justify-between text-[10px] font-mono text-[var(--text-muted)]">
-          <div className="flex items-center gap-3">
-            <span><kbd className="px-1.5 py-0.5 bg-black/40 rounded border border-white/10 text-white font-bold">↑↓</kbd> Navigate</span>
-            <span><kbd className="px-1.5 py-0.5 bg-black/40 rounded border border-white/10 text-white font-bold">↵</kbd> Select</span>
-            <span><kbd className="px-1.5 py-0.5 bg-black/40 rounded border border-white/10 text-white font-bold">Esc</kbd> Close</span>
-          </div>
-          <span className="text-violet-400 font-bold">ProtIntel Command Palette</span>
-        </div>
-      </div>
-    </div>
+            {/* Actions List */}
+            <div className="max-h-84 overflow-y-auto p-2.5 flex flex-col gap-1">
+              {filteredActions.length > 0 ? (
+                filteredActions.map((item, idx) => {
+                  const Icon = item.icon;
+                  const isSelected = idx === selectedIndex;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={item.action}
+                      onMouseEnter={() => setSelectedIndex(idx)}
+                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all text-left cursor-pointer ${
+                        isSelected
+                          ? 'bg-[var(--aurora-violet)]/18 border border-[var(--aurora-violet)]/45 text-[var(--text-primary)] shadow-sm'
+                          : 'text-[var(--text-secondary)] hover:bg-[var(--glass-interactive-hover)] border border-transparent'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`p-2 rounded-lg ${
+                            isSelected
+                              ? 'bg-[var(--aurora-violet)]/30 text-violet-200 shadow-sm'
+                              : 'bg-[var(--glass-tier3)] text-[var(--text-muted)]'
+                          }`}
+                        >
+                          <Icon className="h-4 w-4" strokeWidth={1.8} />
+                        </div>
+                        <div>
+                          <span className="font-semibold block text-xs" style={{ fontFamily: 'var(--font-heading)' }}>
+                            {item.label}
+                          </span>
+                          <span className="text-[10px] font-mono text-[var(--text-muted)]">
+                            {item.subtitle}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[var(--glass-tier3)] text-[var(--text-muted)] border border-[var(--border-subtle)]">
+                          {item.category}
+                        </span>
+                        {isSelected && (
+                          <ArrowRight className="h-3.5 w-3.5 text-[var(--aurora-teal)] animate-pulse" />
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="p-8 text-center text-xs font-mono text-[var(--text-muted)]">
+                  No matching commands or actions found.
+                </div>
+              )}
+            </div>
+
+            {/* Footer Shortcut Key Navigation Hint */}
+            <div className="px-5 py-2.5 border-t border-[var(--border-subtle)] bg-[var(--glass-tier3)] flex items-center justify-between text-[10px] font-mono text-[var(--text-muted)]">
+              <div className="flex items-center gap-3">
+                <span><kbd className="px-1.5 py-0.5 bg-black/40 rounded border border-white/10 text-slate-300 font-bold">↑↓</kbd> Navigate</span>
+                <span><kbd className="px-1.5 py-0.5 bg-black/40 rounded border border-white/10 text-slate-300 font-bold">↵</kbd> Select</span>
+                <span><kbd className="px-1.5 py-0.5 bg-black/40 rounded border border-white/10 text-slate-300 font-bold">Esc</kbd> Close</span>
+              </div>
+              <span className="text-[var(--aurora-teal)] font-bold">ProtIntel HUD</span>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };

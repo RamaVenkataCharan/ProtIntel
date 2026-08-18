@@ -15,7 +15,6 @@ export const StatisticalBreakdownPanels: React.FC<StatisticalBreakdownPanelsProp
   q8Prediction,
   confidence,
 }) => {
-  // Total sequence length
   const safeQ3 = q3Prediction || [];
   const safeQ8 = q8Prediction || safeQ3;
   const safeConf = confidence || [];
@@ -34,7 +33,6 @@ export const StatisticalBreakdownPanels: React.FC<StatisticalBreakdownPanelsProp
 
     const keys: Array<'H' | 'E' | 'C'> = ['H', 'E', 'C'];
     
-    // Compute percentages and largest remainder rounding to sum to exactly 100.0%
     const rawPcts = keys.map(k => (counts[k] / totalLength) * 100);
     const floorPcts = rawPcts.map(p => Math.floor(p));
     let currentSum = floorPcts.reduce((a, b) => a + b, 0);
@@ -114,39 +112,39 @@ export const StatisticalBreakdownPanels: React.FC<StatisticalBreakdownPanelsProp
   }, [q8Prediction, confidence, totalLength]);
 
   return (
-    <div className="flex flex-col gap-6 animate-spring-up mt-2">
+    <div className="flex flex-col gap-5 animate-spring-up mt-2">
       {/* SECTION HEADER */}
-      <div className="flex items-center justify-between pb-2 border-b border-[var(--border-subtle)]">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-teal-500/10 border border-teal-500/30">
-            <PieChart className="h-4 w-4 text-teal-400" />
+      <div className="flex items-center justify-between pb-2.5 border-b border-[var(--border-subtle)]">
+        <div className="flex items-center gap-2.5">
+          <div className="p-1.5 rounded-xl bg-teal-500/10 border border-teal-500/30">
+            <PieChart className="h-4 w-4 text-teal-400" strokeWidth={1.8} />
           </div>
           <div>
             <h4 className="text-sm font-bold text-[var(--text-primary)]" style={{ fontFamily: 'var(--font-heading)' }}>
               Statistical Structure Breakdown
             </h4>
-            <p className="text-[11px] font-mono text-[var(--text-muted)]">
+            <p className="text-[10px] font-mono text-[var(--text-muted)]">
               Aggregate distribution across {totalLength} amino acid residues
             </p>
           </div>
         </div>
-        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-violet-500/15 text-violet-300 border border-violet-500/30">
+        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-violet-500/15 text-violet-300 border border-violet-500/30">
           Q3 & Q8 AGGREGATE
         </span>
       </div>
 
-      {/* ── 1. Q3 BREAKDOWN PANEL ──────────────────────────────────────── */}
-      <div className="surface-tier-2 p-5 rounded-2xl flex flex-col gap-4 border border-[var(--aurora-violet)]/20">
+      {/* Q3 BREAKDOWN PANEL */}
+      <div className="surface-tier-2 p-5 rounded-2xl flex flex-col gap-4 border border-[var(--aurora-violet)]/25">
         <div className="flex items-center justify-between">
           <h5 className="text-xs font-mono font-bold text-[var(--text-primary)] flex items-center gap-2 uppercase tracking-wider">
-            <BarChart2 className="h-3.5 w-3.5 text-violet-400" />
+            <BarChart2 className="h-3.5 w-3.5 text-violet-400" strokeWidth={2} />
             <span>Q3 Class Breakdown (Helix / Sheet / Coil)</span>
           </h5>
-          <span className="text-[10px] font-mono text-[var(--text-muted)]">3 CLASSES</span>
+          <span className="text-[10px] font-mono text-[var(--text-muted)] font-bold">3 CLASSES</span>
         </div>
 
-        {/* Q3 Multi-Segment Stacked Progress Bar */}
-        <div className="h-4 w-full bg-black/40 rounded-xl overflow-hidden flex p-0.5 gap-0.5 border border-white/10">
+        {/* Progress Bar */}
+        <div className="h-3.5 w-full bg-black/40 rounded-xl overflow-hidden flex p-0.5 gap-0.5 border border-white/10">
           {q3Stats.map((item) => {
             const widthPct = parseFloat(item.pct);
             if (widthPct === 0) return null;
@@ -170,17 +168,17 @@ export const StatisticalBreakdownPanels: React.FC<StatisticalBreakdownPanelsProp
           {q3Stats.map((item) => (
             <div
               key={item.key}
-              className="surface-tier-3 p-3.5 rounded-xl flex items-center justify-between border"
+              className="surface-tier-3 p-3.5 rounded-xl flex items-center justify-between border interactive-card"
               style={{ borderColor: `${item.hex}40` }}
             >
               <div className="flex items-center gap-2.5">
-                <span className="w-3 h-3 rounded-md shrink-0" style={{ backgroundColor: item.hex }} />
+                <span className="w-3 h-3 rounded-md shrink-0 shadow-sm" style={{ backgroundColor: item.hex }} />
                 <div>
                   <span className="text-xs font-bold font-mono text-[var(--text-primary)] block">
                     {item.label}
                   </span>
                   <span className="text-[10px] font-mono text-[var(--text-muted)] block">
-                    {item.count} residues ({item.pct}%)
+                    {item.count} res ({item.pct}%)
                   </span>
                 </div>
               </div>
@@ -194,25 +192,25 @@ export const StatisticalBreakdownPanels: React.FC<StatisticalBreakdownPanelsProp
         </div>
       </div>
 
-      {/* ── 2. Q8 BREAKDOWN PANEL ──────────────────────────────────────── */}
-      <div className="surface-tier-2 p-5 rounded-2xl flex flex-col gap-4 border border-teal-500/20">
-        <div className="flex items-center justify-between">
+      {/* Q8 BREAKDOWN PANEL */}
+      <div className="surface-tier-2 p-5 rounded-2xl flex flex-col gap-4 border border-teal-500/25">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <h5 className="text-xs font-mono font-bold text-[var(--text-primary)] flex items-center gap-2 uppercase tracking-wider">
-              <BarChart2 className="h-3.5 w-3.5 text-teal-400" />
+              <BarChart2 className="h-3.5 w-3.5 text-teal-400" strokeWidth={2} />
               <span>Q8 DSSP Class Breakdown</span>
             </h5>
-            <span className="text-[10px] font-mono text-[var(--text-muted)]">8 DETAILED CLASSES</span>
+            <span className="text-[10px] font-mono text-[var(--text-muted)] font-bold">8 DETAILED CLASSES</span>
           </div>
 
           <div className="flex items-center gap-1.5 text-[10px] font-mono text-amber-400/90">
-            <AlertTriangle className="h-3 w-3" />
+            <AlertTriangle className="h-3 w-3" strokeWidth={2} />
             <span>Muted = Minority DSSP Classes (I, B, S)</span>
           </div>
         </div>
 
-        {/* Q8 Multi-Segment Stacked Progress Bar */}
-        <div className="h-4 w-full bg-black/40 rounded-xl overflow-hidden flex p-0.5 gap-0.5 border border-white/10">
+        {/* Progress Bar */}
+        <div className="h-3.5 w-full bg-black/40 rounded-xl overflow-hidden flex p-0.5 gap-0.5 border border-white/10">
           {q8Stats.map((item) => {
             const widthPct = parseFloat(item.pct);
             if (widthPct === 0) return null;
@@ -232,7 +230,7 @@ export const StatisticalBreakdownPanels: React.FC<StatisticalBreakdownPanelsProp
           })}
         </div>
 
-        {/* Q8 Grid — 8 Classes with Minority Reduced-Opacity Treatment & Zero Count Explicit Display */}
+        {/* Q8 Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           {q8Stats.map((item) => {
             const isZero = item.count === 0;
@@ -241,17 +239,17 @@ export const StatisticalBreakdownPanels: React.FC<StatisticalBreakdownPanelsProp
                 key={item.key}
                 className={`p-3 rounded-xl flex flex-col justify-between border transition-all ${
                   item.isMinority
-                    ? 'bg-black/30 border-amber-400/20 opacity-75'
-                    : 'surface-tier-3 border-white/5'
+                    ? 'bg-black/30 border-amber-400/20 opacity-80'
+                    : 'surface-tier-3'
                 }`}
                 style={{
-                  borderColor: isZero ? 'var(--border-subtle)' : `${item.hex}35`,
-                  opacity: item.isMinority ? (isZero ? 0.4 : 0.65) : (isZero ? 0.5 : 1),
+                  borderColor: isZero ? 'var(--border-subtle)' : `${item.hex}40`,
+                  opacity: item.isMinority ? (isZero ? 0.45 : 0.7) : (isZero ? 0.55 : 1),
                 }}
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: item.hex }} />
+                    <span className="w-2.5 h-2.5 rounded-sm shrink-0 shadow-sm" style={{ backgroundColor: item.hex }} />
                     <span className="text-xs font-bold font-mono text-[var(--text-primary)]">
                       {item.key}
                     </span>
@@ -273,7 +271,7 @@ export const StatisticalBreakdownPanels: React.FC<StatisticalBreakdownPanelsProp
                     </span>
                     {!isZero && (
                       <span className="text-teal-400 text-[9px] font-bold">
-                        {item.avgConf}% conf
+                        {item.avgConf}%
                       </span>
                     )}
                   </div>
