@@ -17,7 +17,7 @@
 
 ### 🖥️ Platform Dashboard
 ![ProtIntel Dashboard Overview](docs/images/dashboard_overview.png)
-
+  
 ### 🔬 Interactive 3D Secondary Structure Visualizer
 Featuring studio 4-point scientific lighting, dynamic bounding-sphere 3/4 isometric auto-framing, distance measurement, and cinematic fly-through camera tours:
 ![3D Structure Viewer](docs/images/3d_structure_viewer.png)
