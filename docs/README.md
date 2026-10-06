@@ -1,163 +1,197 @@
-# ProtIntel — Explainable Protein Secondary Structure Prediction
+# ProtIntel Documentation
 
-<p align="center">
-  <strong>ESM-2 · CNN-BiLSTM · Attention-Based Learning</strong>
-</p>
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-red)](https://pytorch.org/) [![FastAPI](https://img.shields.io/badge/FastAPI-0.104%2B-teal)](https://fastapi.tiangolo.com/) [![React](https://img.shields.io/badge/React-18-blue)](https://react.dev/) [![Three.js](https://img.shields.io/badge/Three.js-r128-black)](https://threejs.org/)
+
+This folder contains project-level documentation and reference material for ProtIntel, an explainable protein secondary structure prediction system powered by ESM-2 embeddings and a CNN–BiLSTM–Attention architecture.
+
+---
 
 ## Overview
 
-ProtIntel is a production-grade deep learning system for predicting protein secondary structure (Q3 and Q8) from amino acid sequences. It combines:
+ProtIntel predicts protein secondary structure from amino acid sequences in two complementary settings:
 
-- **ESM-2** (650M parameter protein language model) for rich per-residue embeddings
-- **Multi-scale CNN** for local residue pattern detection
-- **Bidirectional LSTM** for long-range sequential dependencies
-- **Multi-head self-attention** with explainable attention weights
-- **Explainable AI** via Integrated Gradients, SHAP, and attention rollout
+- Q3 prediction: Helix, Strand, Coil
+- Q8 prediction: DSSP 8-state labels (H, E, G, I, B, T, S, C)
 
-### Team
-- B. Murali Gopi
-- M. Kumar Siva Sai
-- M. Rama Venkata Charan
-- Yashwanth Prakash
-
-**Guide:** Mrs. V. Aruna  
-**Academic Context:** Final Year B.Tech (Computer Science) Project
+The system is designed for both scientific research and practical deployment. It produces high-level confidence estimates and interpretable residue-level explanations using XAI techniques such as Integrated Gradients and SHAP.
 
 ---
 
-## Quick Start
+## Why this project matters
+
+Protein structure prediction remains a foundational problem in bioinformatics and computational biology. Traditional sequence-based methods often struggle to capture global structural context. ProtIntel addresses this by combining:
+
+- ESM-2 protein embeddings for rich contextual sequence representation
+- multi-scale CNNs for local motif detection
+- bidirectional LSTM for long-range sequence reasoning
+- attention modules for interpretability and dependency modeling
+- XAI visualizations to explain model decisions
+
+---
+
+## System architecture
+
+```text
+Amino Acid Sequence (FASTA)
+          ↓
+[ESM-2 650M Transformer]
+   Per-residue embeddings: L × 1280
+          ↓
+[Multi-scale 1D CNN]
+   kernels: 3, 5, 7 + residual blocks
+          ↓
+[Bidirectional LSTM]
+   long-range context modeling
+          ↓
+[Multi-head self-attention]
+   explainable sequence dependencies
+          ↓
+   ┌───────────────┴───────────────┐
+   ↓                               ↓
+Q3 Head                         Q8 Head
+(H / E / C)                  (DSSP 8-state)
+```
+
+---
+
+## Documentation structure
+
+```text
+docs/
+├── README.md               # Project documentation overview
+├── images/                 # UI screenshots and model visual assets
+├── architecture/           # Architecture notes and diagrams (if added)
+├── api/                    # API docs and usage examples (if added)
+├── evaluation/             # Benchmark and metrics documentation (if added)
+└── notebooks/             # Optional exploratory analysis notebooks
+```
+
+---
+
+## Quick start
+
+### 1. Clone the repository
 
 ```bash
-# 1. Clone and install
-git clone https://github.com/RamaVenkataCharan/ProtIntel
+git clone https://github.com/RamaVenkataCharan/ProtIntel.git
 cd ProtIntel
+```
+
+### 2. Create and activate a virtual environment
+
+```bash
+python -m venv .venv
+
+# Linux / macOS
+source .venv/bin/activate
+
+# Windows
+.venv\Scripts\activate
+```
+
+### 3. Install dependencies
+
+```bash
 pip install -r requirements.txt
+```
 
-# 2. Download datasets
-python scripts/download_data.py
+### 4. Run backend
 
-# 3. Preprocess
-python scripts/preprocess.py
-
-# 4. Generate ESM-2 embeddings (requires ~2.5 GB download)
-python scripts/generate_embeddings.py --device cuda
-
-# 5. Train
-python train.py --device cuda
-
-# 6. Evaluate on CB513
-python evaluate.py
-
-# 7. Run API server
+```bash
 python backend/main.py
-
-# 8. Run frontend (separate terminal)
-cd frontend && npm install && npm run dev
 ```
+
+### 5. Launch frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend is typically served at `http://localhost:5173`, and the API runs at `http://localhost:8000`.
 
 ---
 
-## Architecture
+## API overview
 
-```
-Raw Amino Acid Sequence
-        │
-        ▼
-┌─────────────────────┐
-│  ESM-2 (650M)       │  Per-residue embeddings: (L × 1280)
-└─────────────────────┘
-        │
-        ▼
-┌─────────────────────┐
-│  Multi-Scale CNN     │  Kernels: 3, 5, 7 + Residual blocks
-└─────────────────────┘
-        │
-        ▼
-┌─────────────────────┐
-│  Bidirectional LSTM  │  2 layers, captures long-range deps
-└─────────────────────┘
-        │
-        ▼
-┌─────────────────────┐
-│  Multi-Head Attention│  8 heads, returns weights for XAI
-└─────────────────────┘
-        │
-     ┌──┴──┐
-     ▼     ▼
-   Q3     Q8
-  Head   Head
-```
+The backend exposes a minimal REST API for inference and analysis.
 
-**Q3 classes:** Helix (H), Sheet (E), Coil (C)  
-**Q8 classes:** H, E, G, I, B, T, S, C
+| Method | Endpoint | Purpose |
+|:---:|:---|:---|
+| `POST` | `/predict` | Single sequence prediction |
+| `POST` | `/predict_batch` | Batch FASTA or multi-sequence prediction |
+| `POST` | `/upload` | Predict from uploaded FASTA file |
+| `GET` | `/model_info` | Model metadata and runtime configuration |
+| `GET` | `/metrics` | Evaluation metrics and benchmark summaries |
+| `GET` | `/health` | Server health check |
 
----
+Example request:
 
-## Hardware Requirements
-
-| Component | Minimum | Recommended |
-|-----------|---------|-------------|
-| GPU VRAM | 4 GB (inference) | 12+ GB (training) |
-| RAM | 8 GB | 16+ GB |
-| Disk | 15 GB | 30 GB |
-| Python | 3.10+ | 3.11 |
-
----
-
-## Project Structure
-
-```
-ProtIntel/
-├── configs/          # YAML configuration files
-├── src/
-│   ├── data/         # Dataset, preprocessing, augmentation
-│   ├── models/       # ESM-2, CNN, BiLSTM, attention, full model
-│   ├── training/     # Losses, metrics, callbacks, trainer
-│   ├── evaluation/   # Evaluator, visualizer
-│   ├── xai/          # Integrated Gradients, SHAP, attention rollout
-│   └── utils/        # Config, logging, I/O, reproducibility
-├── backend/          # FastAPI REST API
-├── frontend/         # React/TypeScript UI
-├── scripts/          # Data download, preprocessing, benchmarking
-├── tests/            # Unit, integration, API tests
-├── docs/             # Documentation
-└── docker/           # Dockerfiles and docker-compose
-```
-
----
-
-## API Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/predict` | Single sequence prediction |
-| POST | `/predict_batch` | Batch prediction (up to 50) |
-| POST | `/upload` | Upload FASTA file |
-| GET | `/model_info` | Architecture info |
-| GET | `/metrics` | Benchmark metrics |
-| GET | `/health` | Health check |
-
-Example:
 ```bash
 curl -X POST http://localhost:8000/predict \
   -H "Content-Type: application/json" \
-  -d '{"sequence": "MKFLILLFNILCLFPVLAADNHGVSMNAS", "return_xai": true}'
+  -d '{
+    "sequence": "MQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDYNIQKESTLHLVLRLRGG",
+    "return_xai": true,
+    "xai_method": "ig"
+  }'
 ```
 
 ---
 
-## Testing
+## Explainability and interpretability
 
-```bash
-# Run all tests
-pytest tests/ -v
+ProtIntel is designed not only to predict secondary structure but also to explain it.
 
-# Unit tests only
-pytest tests/unit/ -v
+### Included explainability methods
 
-# Integration tests
-pytest tests/integration/ -v
-```
+- Integrated Gradients (IG)
+- SHAP values
+- Attention-based attribution and rollout analysis
+
+These techniques enable residue-level explanation and help identify which amino acids drive a prediction.
+
+---
+
+## Evaluation workflow
+
+The project includes evaluation utilities for benchmarking on protein secondary structure datasets, including CB513-style evaluation pipelines.
+
+Typical outputs include:
+
+- confusion matrices
+- per-class precision/recall/F1
+- MCC and accuracy summaries
+- confidence distributions
+- predicted class breakdowns
+
+---
+
+## Training and data flow
+
+A typical workflow:
+
+1. Download the benchmark dataset
+2. Preprocess protein sequences
+3. Generate ESM-2 embeddings
+4. Train the model with sequence-label supervision
+5. Evaluate on validation or benchmark splits
+6. Run inference via CLI or web UI
+7. Inspect explanations through the 3D visualization and XAI panels
+
+---
+
+## Team and academic context
+
+- M. Rama Venkata Charan
+- B. Murali Gopi
+- M. Kumar Siva Sai
+- Yashwanth Prakash
+
+Guide: Mrs. V. Aruna
+
+Academic context: Final Year B.Tech Computer Science Project
 
 ---
 
@@ -176,4 +210,10 @@ pytest tests/integration/ -v
 
 ## License
 
-MIT License
+This project is licensed under the [MIT License](../LICENSE).
+
+---
+
+## Contributing
+
+Contributions are welcome. Please see the repository-level [CONTRIBUTING.md](../CONTRIBUTING.md) for coding standards, workflow guidance, and pull request expectations.
