@@ -1,34 +1,26 @@
 @echo off
-:: ============================================================
-::  ProtIntel — Demo Stopper
-::  Kills the backend and frontend console windows opened by
-::  start_protintel.bat, then terminates any lingering uvicorn
-::  or node processes bound to ports 8000 / 5173.
-:: ============================================================
+rem ============================================================
+rem  ProtIntel - Demo Stopper
+rem  Kills backend and frontend services on ports 8000 / 5173.
+rem ============================================================
 
 setlocal
 
 echo.
 echo  =========================================
-echo   ProtIntel — Stopping Demo Services
+echo   ProtIntel - Stopping Demo Services
 echo  =========================================
 echo.
 
-:: Kill by window title (matches titles set by start_protintel.bat)
-taskkill /FI "WINDOWTITLE eq ProtIntel — Backend*"  /T /F > nul 2>&1
-taskkill /FI "WINDOWTITLE eq ProtIntel — Frontend*" /T /F > nul 2>&1
+rem Kill console windows by title
+taskkill /FI "WINDOWTITLE eq ProtIntel - Backend*"  /T /F > nul 2>&1
+taskkill /FI "WINDOWTITLE eq ProtIntel - Frontend*" /T /F > nul 2>&1
 
-:: Also terminate by image name in case the windows were renamed
-:: Kill uvicorn processes
-taskkill /IM uvicorn.exe /F > nul 2>&1
-
-:: Kill node processes on port 5173 (Vite dev server)
-for /f "tokens=5" %%p in ('netstat -aon ^| findstr ":5173 "') do (
+rem Terminate any processes bound to port 8000 or 5173
+for /f "tokens=5" %%p in ('netstat -aon ^| findstr ":8000 "') do (
     taskkill /PID %%p /F > nul 2>&1
 )
-
-:: Kill any process on port 8000 (FastAPI / uvicorn)
-for /f "tokens=5" %%p in ('netstat -aon ^| findstr ":8000 "') do (
+for /f "tokens=5" %%p in ('netstat -aon ^| findstr ":5173 "') do (
     taskkill /PID %%p /F > nul 2>&1
 )
 
