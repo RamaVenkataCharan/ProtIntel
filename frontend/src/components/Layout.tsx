@@ -20,9 +20,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   useEffect(() => {
     checkStatus();
-    const interval = setInterval(checkStatus, 30000);
+    // Poll every 3 seconds if disconnected/loading, then every 30 seconds once healthy
+    const pollInterval = isHealthy ? 30000 : 3000;
+    const interval = setInterval(checkStatus, pollInterval);
     return () => clearInterval(interval);
-  }, []);
+  }, [isHealthy]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
