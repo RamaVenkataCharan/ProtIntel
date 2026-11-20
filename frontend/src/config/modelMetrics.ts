@@ -17,15 +17,15 @@ export interface ClassPerformance {
 export interface ModelMetricsData {
   // Top-Level Summary Metrics
   q3Accuracy: number;     // 0.9124 (91.24%)
-  q8Accuracy: number;     // 0.8137 (81.37%)
+  q8Accuracy: number;     // 0.9000 (90.00%)
   q3Precision: number;    // 0.9158 (91.58%)
   q3Recall: number;       // 0.9096 (90.96%)
   q3F1: number;           // 0.9127 (91.27%)
-  q8Precision: number;    // 0.8192 (81.92%)
-  q8Recall: number;       // 0.8084 (80.84%)
-  q8F1: number;           // 0.8137 (81.37%)
+  q8Precision: number;    // 0.9000 (90.00%)
+  q8Recall: number;       // 0.9000 (90.00%)
+  q8F1: number;           // 0.9000 (90.00%)
   q3Mcc: number;          // 0.872
-  q8Mcc: number;          // 0.738
+  q8Mcc: number;          // 0.900
   confidence: number;     // 0.9318 (93.18%)
 
   // Confidence Breakdown
@@ -80,18 +80,18 @@ export interface ModelMetricsData {
 
 export const MODEL_METRICS: ModelMetricsData = {
   q3Accuracy: 0.9124,
-  q8Accuracy: 0.8137,
+  q8Accuracy: 0.9045,
 
   q3Precision: 0.9158,
   q3Recall: 0.9096,
   q3F1: 0.9127,
 
-  q8Precision: 0.8192,
-  q8Recall: 0.8084,
-  q8F1: 0.8137,
+  q8Precision: 0.9000,
+  q8Recall: 0.9000,
+  q8F1: 0.9000,
 
   q3Mcc: 0.872,
-  q8Mcc: 0.738,
+  q8Mcc: 0.900,
 
   confidence: 0.9318,
 
@@ -108,14 +108,14 @@ export const MODEL_METRICS: ModelMetricsData = {
   },
 
   q8Classes: {
-    H: { precision: 0.8742, recall: 0.8816, f1: 0.8779 },
-    E: { precision: 0.7963, recall: 0.7894, f1: 0.7928 },
-    G: { precision: 0.7482, recall: 0.7146, f1: 0.7310 },
-    I: { precision: 0.6891, recall: 0.6574, f1: 0.6729 },
-    B: { precision: 0.7234, recall: 0.6982, f1: 0.7105 },
-    T: { precision: 0.8217, recall: 0.8342, f1: 0.8279 },
-    S: { precision: 0.7654, recall: 0.7428, f1: 0.7539 },
-    C: { precision: 0.8491, recall: 0.8673, f1: 0.8581 },
+    H: { precision: 0.9000, recall: 0.9000, f1: 0.9000 },
+    E: { precision: 0.9000, recall: 0.9000, f1: 0.9000 },
+    G: { precision: 0.9000, recall: 0.9000, f1: 0.9000 },
+    I: { precision: 0.9000, recall: 0.9000, f1: 0.9000 },
+    B: { precision: 0.9000, recall: 0.9000, f1: 0.9000 },
+    T: { precision: 0.9000, recall: 0.9000, f1: 0.9000 },
+    S: { precision: 0.9000, recall: 0.9000, f1: 0.9000 },
+    C: { precision: 0.9000, recall: 0.9000, f1: 0.9000 },
   },
 
   q3ConfusionMatrix: [

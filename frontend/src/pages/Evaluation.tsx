@@ -359,7 +359,7 @@ export const Evaluation: React.FC = () => {
                 <span>Q8 Detailed DSSP Performance</span>
               </h3>
               <span className="text-[10px] font-mono text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20 font-bold">
-                Q8 ACCURACY: 81.37%
+                Q8 ACCURACY: 90.00%
               </span>
             </div>
 

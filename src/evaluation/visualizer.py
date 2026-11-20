@@ -25,7 +25,7 @@ COLORS = {
     "sheet": "#4ECDC4",
     "coil": "#95A5A6",
     "primary": "#00D4FF",
-    "secondary": "#7C3AED",
+    "secondary": "#7C3AED",   
     "background": "#0A0E1A",
 }
 
@@ -244,3 +244,17 @@ class Visualizer:
 
         logger.info(f"Saved interactive confidence plot: {output_path}")
         return output_path
+
+
+
+
+
+
+
+
+
+
+
+
+
+

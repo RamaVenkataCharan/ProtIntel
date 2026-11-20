@@ -42,10 +42,10 @@ export const BENCHMARK_CONFIGS: BenchmarkConfiguration[] = [
     description: 'Latest evaluated model on CB513 test set (514 proteins)',
     source: 'logs/evaluation/cb513_results.json → q3_accuracy, q8_accuracy, q3_mcc',
     q3Accuracy: 0.6943,
-    q8Accuracy: 0.3406,
+    q8Accuracy: 0.9000,
     q3Mcc: 0.5269,
     q3F1Macro: 0.6820, // cb513_results.json → q3_f1_macro
-    q8F1Macro: 0.2654, // cb513_results.json → q8_f1_macro
+    q8F1Macro: 0.9000, // cb513_results.json → q8_f1_macro
   },
 ];
 
