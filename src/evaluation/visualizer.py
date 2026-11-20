@@ -245,16 +245,3 @@ class Visualizer:
         logger.info(f"Saved interactive confidence plot: {output_path}")
         return output_path
 
-
-
-
-
-
-
-
-
-
-
-
-
-
