@@ -9,9 +9,9 @@ $ErrorActionPreference = 'Stop'
 $ScriptDir    = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $ProjectRoot  = $ScriptDir
 $StartBat     = Join-Path $ProjectRoot 'start_protintel.bat'
+$StopBat      = Join-Path $ProjectRoot 'stop_protintel.bat'
 $DesktopPath  = [Environment]::GetFolderPath('Desktop')
-$ShortcutName = 'ProtIntel - Launch Demo.lnk'
-$ShortcutPath = Join-Path $DesktopPath $ShortcutName
+$ShortcutNames = @('ProtIntel.lnk', 'ProtIntel - Launch Demo.lnk')
 $IconIco      = Join-Path $ProjectRoot 'frontend\public\protintel.ico'
 
 # Generate a custom ICO using System.Drawing (lightning bolt in brand purple)
@@ -96,21 +96,35 @@ try {
     Write-Host "  Using fallback icon: $IconLocation"
 }
 
-# Create the .lnk shortcut via WScript.Shell
-$ws        = New-Object -ComObject WScript.Shell
-$lnk       = $ws.CreateShortcut($ShortcutPath)
-$lnk.TargetPath       = $StartBat
-$lnk.WorkingDirectory = $ProjectRoot
-$lnk.Description      = 'Launch ProtIntel demo - backend and frontend'
-$lnk.WindowStyle      = 1
-$lnk.IconLocation     = $IconLocation
-$lnk.Save()
-
+# Create the .lnk shortcut(s) via WScript.Shell
+$ws = New-Object -ComObject WScript.Shell
 Write-Host ''
 Write-Host '  ========================================='
-Write-Host '   ProtIntel Desktop Shortcut Created!'
+Write-Host '   ProtIntel Desktop Shortcut(s) Created!'
 Write-Host '  ========================================='
-Write-Host "  Shortcut    : $ShortcutPath"
+foreach ($sName in $ShortcutNames) {
+    $sPath = Join-Path $DesktopPath $sName
+    $lnk   = $ws.CreateShortcut($sPath)
+    $lnk.TargetPath       = $StartBat
+    $lnk.WorkingDirectory = $ProjectRoot
+    $lnk.Description      = 'Launch ProtIntel demo - backend and frontend'
+    $lnk.WindowStyle      = 1
+    $lnk.IconLocation     = $IconLocation
+    $lnk.Save()
+    Write-Host "  Launch Shortcut : $sPath"
+}
+
+# Also create a Stop Demo shortcut
+$StopLnkPath = Join-Path $DesktopPath 'ProtIntel - Stop Demo.lnk'
+$lnkStop = $ws.CreateShortcut($StopLnkPath)
+$lnkStop.TargetPath       = $StopBat
+$lnkStop.WorkingDirectory = $ProjectRoot
+$lnkStop.Description      = 'Stop all ProtIntel backend and frontend services'
+$lnkStop.WindowStyle      = 1
+$lnkStop.IconLocation     = 'C:\Windows\System32\shell32.dll,27'
+$lnkStop.Save()
+Write-Host "  Stop Shortcut   : $StopLnkPath"
+
 Write-Host "  Target      : $StartBat"
 Write-Host "  Working Dir : $ProjectRoot"
 Write-Host "  Icon        : $IconLocation"

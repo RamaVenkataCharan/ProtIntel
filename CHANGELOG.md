@@ -2,6 +2,14 @@
 
 All notable changes to this project are recorded in this file.
 
+## 2026-11-24 — Desktop shortcut generation & stop script reliability
+
+- **Desktop Shortcuts**:
+  - Enhanced `create_shortcut.ps1` to create both `ProtIntel.lnk` and `ProtIntel - Launch Demo.lnk` pointing to `start_protintel.bat` with the custom brand icon.
+  - Added creation of `ProtIntel - Stop Demo.lnk` on the Desktop pointing to `stop_protintel.bat` for one-click termination of background services.
+- **Stop Script Reliability**:
+  - Replaced `timeout /t 2 /nobreak > nul` with `ping 127.0.0.1 -n 3 > nul` in `stop_protintel.bat` to avoid Windows input redirection errors in non-interactive sessions.
+
 ## 2026-11-21 — Service lifecycle, launcher stability & UI telemetry
 
 - **Service Lifecycle & Launcher**:

@@ -26,5 +26,5 @@ for /f "tokens=5" %%p in ('netstat -aon ^| findstr ":5173 "') do (
 
 echo  Done. All ProtIntel services have been stopped.
 echo.
-timeout /t 2 /nobreak > nul
+ping 127.0.0.1 -n 3 > nul
 endlocal
