@@ -12,7 +12,7 @@ ProtIntel is a production-ready research platform that predicts protein secondar
 
 ---
 
-## Table of contents
+## Table of contents  
 
 - [Demo](#demo)
 - [Highlights](#highlights)
